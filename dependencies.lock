@@ -1,0 +1,146 @@
+dependencies:
+  espressif/button:
+    component_hash: 5357a6a2c0c47fa67eb9a4dad8cbd78f848d05409b3557e49ec9948898655cfb
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.0'
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 3.4.0
+  espressif/cmake_utilities:
+    component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    dependencies:
+    - name: idf
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=4.1'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 0.5.3
+  espressif/esp32_c3_lcdkit:
+    component_hash: 3f33b3628f3c6e2e5219331c5fdf26e04f19e147074184679db66e0c471ae4df
+    dependencies:
+    - name: espressif/led_strip
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^2
+    - name: espressif/knob
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^0.1.3
+    - name: idf
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=5.0.0'
+    - name: espressif/esp_lvgl_port
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^2
+    - name: espressif/esp_lcd_gc9a01
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^1
+    - name: espressif/esp_codec_dev
+      registry_url: https://components.espressif.com
+      require: public
+      version: ^1,<1.2
+    - name: espressif/button
+      registry_url: https://components.espressif.com
+      require: public
+      version: '>=2,<4.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32c3
+    version: 1.1.0~1
+  espressif/esp_codec_dev:
+    component_hash: 1a3a2e518cd8b52e8796ec393a4050977f8f113599056faf085a02a57e194f86
+    dependencies:
+    - name: idf
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=4.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.1.0
+  espressif/esp_lcd_gc9a01:
+    component_hash: 2ccbdfa5a1762c7a8be66770b69a256d809651d6069098852d2c829648707b5b
+    dependencies:
+    - name: idf
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=4.4'
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.2.0
+  espressif/esp_lvgl_port:
+    component_hash: 7aa8ec9fd418b90efe2d89164b758893c5dad47628ed1d578c52b3b7e89000b9
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.4'
+    - name: lvgl/lvgl
+      registry_url: https://components.espressif.com
+      require: public
+      version: '>=8,<10'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 2.4.2
+  espressif/knob:
+    component_hash: aeec301a28a84d3a24aeeaef79c8bcffb4ecc153316570fef710ff27e2399d5a
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: idf
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=4.4.1'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 0.1.5
+  espressif/led_strip:
+    component_hash: 28c6509a727ef74925b372ed404772aeedf11cce10b78c3f69b3c66799095e2d
+    dependencies:
+    - name: idf
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=4.4'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 2.5.5
+  idf:
+    source:
+      type: idf
+    version: 5.5.0
+  lvgl/lvgl:
+    component_hash: 096c69af22eaf8a2b721e3913da91918c5e6bf1a762a113ec01f401aa61337a0
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 9.2.2
+direct_dependencies:
+- espressif/esp32_c3_lcdkit
+- idf
+manifest_hash: a23eaefe19837b02ab008e7eb643a9680ab03c96a2bca9e5b44df43ee8d49145
+target: esp32c3
+version: 2.0.0
