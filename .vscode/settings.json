@@ -14,6 +14,8 @@
     "idf.pythonBinPath": "/home/sam/.espressif/python_env/idf5.5_py3.10_env/bin/python",
     "idf.toolsPath": "/home/sam/.espressif",
     "files.associations": {
-        "nvs_flash.h": "c"
+        "nvs_flash.h": "c",
+        "esp_event.h": "c",
+        "mpd.h": "c"
     }
 }

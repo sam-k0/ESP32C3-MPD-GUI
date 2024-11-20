@@ -33,5 +33,8 @@ void app_main(void)
 
     vTaskDelay(pdMS_TO_TICKS(500));
     bsp_display_backlight_on();
-    wifi_init_sta();
+    wifi_init_sta(); // Init wifi station
+
+    // Connect to MPD
+    connect_send_close(MPD_HOST, MPD_PORT, "status\n", mpd_resp_buf, sizeof(mpd_resp_buf));
 }

@@ -10,7 +10,8 @@
 #include "nvs_flash.h" //non volatile storage
 #include "lwip/err.h" //light weight ip packets error handling
 #include "lwip/sys.h" //system applications for light weight ip apps
-
+#include "lwip/sockets.h" //sockets for lwip
+#include "lwip/inet.h" //internet operations for lwip
 
 
 static void event_handler(void* arg, esp_event_base_t event_base,
@@ -103,3 +104,185 @@ void wifi_init_sta(void)
         ESP_LOGE(WIFI_TAG, "UNEXPECTED EVENT");
     }
 }
+
+int connect_mpd(const char* ip_addr, uint16_t port)
+{
+    int sock = -1; // socket file descriptor
+    struct sockaddr_in dest_addr; // server address
+
+    // Create a socket
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
+    {
+        ESP_LOGE("MPD", "Socket creation failed");
+        return -1;
+    }
+
+    // Set the dest address
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_addr.s_addr = inet_addr(ip_addr);
+    dest_addr.sin_port = htons(port);
+
+    // Connect to the server
+    if (connect(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) 
+    {
+        ESP_LOGE("MPD", "Connection to server failed");
+        return -1;
+    }
+
+    return sock;
+}
+
+int send_mpd_cmd(int sock, const char *cmd, char* resp, size_t resp_size)
+{
+    ESP_LOGI("MPD", "Sending command: %s", cmd);
+    int bytes_sent = send(sock, cmd, strlen(cmd), 0);
+    if (bytes_sent < 0) 
+    {
+        ESP_LOGE("MPD", "Failed to send command");
+        return -1;
+    }
+
+    int bytes_recv = recv(sock, resp, resp_size-1, 0); // -1 to leave room for null terminator
+    if (bytes_recv < 0) 
+    {
+        ESP_LOGE("MPD", "Failed to receive response");
+        return -1;
+    }
+
+    resp[bytes_recv] = '\0'; // null terminate the response
+
+    ESP_LOGI("MPD", "Response: %s", resp);
+    return bytes_recv; // return the number of bytes received
+}
+
+// Connect to the MPD server, send a command, and close the connection
+int connect_send_close(const char* ip_addr, uint16_t port, const char *cmd, char* resp, size_t resp_size)
+{
+    int sock = connect_mpd(ip_addr, port);
+    if (sock < 0) 
+    {
+        return -1;
+    }
+
+    int bytes_recv = send_mpd_cmd(sock, cmd, resp, resp_size);
+    close(sock);
+    return bytes_recv;
+}
+
+bool parse_mpd_status(const char *response, mpd_status_t *status) {
+    if (response == NULL || status == NULL) {
+        ESP_LOGE("MPD_PARSER", "Invalid arguments to parse_mpd_status.");
+        return false;
+    }
+    memset(status, 0, sizeof(mpd_status_t));
+
+    char *line = strtok((char *)response, "\n");
+    while (line != NULL) {
+        if (sscanf(line, "volume: %hhd", &status->volume) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed volume: %d", status->volume);
+        } else if (sscanf(line, "repeat: %hhd", (int8_t *)&status->repeat) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed repeat: %d", status->repeat);
+        } else if (sscanf(line, "random: %hhd", (int8_t *)&status->random) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed random: %d", status->random);
+        } else if (sscanf(line, "single: %hhd", (int8_t *)&status->single) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed single: %d", status->single);
+        } else if (sscanf(line, "consume: %hhd", (int8_t *)&status->consume) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed consume: %d", status->consume);
+        } else if (sscanf(line, "playlist: %hu", &status->playlist) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed playlist: %d", status->playlist);
+        } else if (sscanf(line, "playlistlength: %hu", &status->playlistlength) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed playlist length: %d", status->playlistlength);
+        } else if (strncmp(line, "state: play", 11) == 0) {
+            status->state = MPD_STATE_PLAY;
+            ESP_LOGI("MPD_PARSER", "Parsed state: play");
+        } else if (strncmp(line, "state: pause", 12) == 0) {
+            status->state = MPD_STATE_PAUSE;
+            ESP_LOGI("MPD_PARSER", "Parsed state: pause");
+        } else if (strncmp(line, "state: stop", 11) == 0) {
+            status->state = MPD_STATE_STOP;
+            ESP_LOGI("MPD_PARSER", "Parsed state: stop");
+        } else if (sscanf(line, "song: %hu", &status->song) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed song: %d", status->song);
+        } else if (sscanf(line, "elapsed: %u", &status->elapsed) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed elapsed: %d", status->elapsed);
+        } else if (sscanf(line, "bitrate: %hu", &status->bitrate) == 1) {
+            ESP_LOGI("MPD_PARSER", "Parsed bitrate: %d", status->bitrate);
+        }
+
+        line = strtok(NULL, "\n");
+    }
+    return true;
+}
+
+mpd_status_t mpd_get_status()
+{
+    mpd_status_t status;
+    memset(&status, 0, sizeof(mpd_status_t));
+    connect_send_close(MPD_HOST, MPD_PORT, "status\n", mpd_resp_buf, sizeof(mpd_resp_buf));
+    parse_mpd_status(mpd_resp_buf, &status);
+    return status;
+}
+
+// Parse the current song response
+void parse_mpd_currentsong(const char *response, mpd_song_t *song)
+{
+    // Parse the response line by line
+    char *line = strtok(response, "\n");
+    while (line != NULL) {
+        if (strncmp(line, "Title: ", 7) == 0) {
+            strncpy(song->title, line + 7, sizeof(song->title) - 1);
+        } else if (strncmp(line, "Artist: ", 8) == 0) {
+            strncpy(song->artist, line + 8, sizeof(song->artist) - 1);
+        } else if (strncmp(line, "Album: ", 7) == 0) {
+            strncpy(song->album, line + 7, sizeof(song->album) - 1);
+        } else if (strncmp(line, "file: ", 6) == 0) {
+            strncpy(song->file, line + 6, sizeof(song->file) - 1);
+        } else if (sscanf(line, "Time: %u", &song->duration) == 1) {
+            // Duration parsed
+        } else if (sscanf(line, "Pos: %hu", &song->position) == 1) {
+            // Position parsed
+        } else if (sscanf(line, "Id: %hu", &song->id) == 1) {
+            // ID parsed
+        }
+
+        // Get the next line
+        line = strtok(NULL, "\n");
+    }
+}
+
+mpd_song_t mpd_get_currentsong()
+{
+    mpd_song_t song;
+    memset(&song, 0, sizeof(mpd_song_t));
+    connect_send_close(MPD_HOST, MPD_PORT, "currentsong\n", mpd_resp_buf, sizeof(mpd_resp_buf));
+    parse_mpd_currentsong(mpd_resp_buf, &song);
+    return song;
+}
+
+int mpd_set_volume(int volume)
+{
+    char cmd[32]; // format buffer
+    snprintf(cmd, sizeof(cmd), "setvol %d\n", volume); // format the command
+    return connect_send_close(MPD_HOST, MPD_PORT, cmd, mpd_resp_buf, sizeof(mpd_resp_buf));
+}
+
+int mpd_next()
+{
+    return connect_send_close(MPD_HOST, MPD_PORT, "next\n", mpd_resp_buf, sizeof(mpd_resp_buf));
+}
+
+int mpd_prev()
+{
+    return connect_send_close(MPD_HOST, MPD_PORT, "previous\n", mpd_resp_buf, sizeof(mpd_resp_buf));
+}
+
+int mpd_play()
+{
+    return connect_send_close(MPD_HOST, MPD_PORT, "play\n", mpd_resp_buf, sizeof(mpd_resp_buf));
+}
+
+int mpd_pause()
+{
+    return connect_send_close(MPD_HOST, MPD_PORT, "pause\n", mpd_resp_buf, sizeof(mpd_resp_buf));
+}
+

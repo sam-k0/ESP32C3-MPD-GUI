@@ -8,6 +8,7 @@
 #endif
 
 #include "lv_example_pub.h"
+#include "mpd.h"
 
 
 static bool main_layer_enter_cb(void *layer);
