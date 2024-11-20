@@ -151,7 +151,7 @@ int send_mpd_cmd(int sock, const char *cmd, char* resp, size_t resp_size)
 
     resp[bytes_recv] = '\0'; // null terminate the response
 
-    ESP_LOGI("MPD", "Response: %s", resp);
+    //ESP_LOGI("MPD", "Response: %s", resp);
     return bytes_recv; // return the number of bytes received
 }
 
@@ -163,6 +163,18 @@ int connect_send_close(const char* ip_addr, uint16_t port, const char *cmd, char
     {
         return -1;
     }
+
+    // Discard the greeting message
+    char temp_buf[256]; // Temporary buffer for the greeting message
+    int greeting_recv = recv(sock, temp_buf, sizeof(temp_buf) - 1, 0);
+    if (greeting_recv <= 0) 
+    {
+        ESP_LOGE("MPD", "Failed to receive greeting from MPD");
+        close(sock);
+        return -1;
+    }
+    temp_buf[greeting_recv] = '\0';
+    ESP_LOGI("MPD", "Greeting: %s", temp_buf);
 
     int bytes_recv = send_mpd_cmd(sock, cmd, resp, resp_size);
     close(sock);
@@ -226,29 +238,68 @@ mpd_status_t mpd_get_status()
 // Parse the current song response
 void parse_mpd_currentsong(const char *response, mpd_song_t *song)
 {
+    if (response == NULL || song == NULL) {
+        ESP_LOGE("MPD_PARSER", "Invalid arguments to parse_mpd_currentsong.");
+        return;
+    }
+
+    // Log the full response for debugging
+    ESP_LOGI("MPD_PARSER", "Response:\n%s", response);
+
+    // Copy the response into a mutable buffer to avoid modifying the original string
+    char response_copy[512]; // Ensure this buffer is large enough to hold the response
+    strncpy(response_copy, response, sizeof(response_copy) - 1);
+    response_copy[sizeof(response_copy) - 1] = '\0'; // Null-terminate to be safe
+
+    // Use strtok to split the response into lines based on the newline character
+    char *line = strtok(response_copy, "\n");
+
     // Parse the response line by line
-    char *line = strtok(response, "\n");
     while (line != NULL) {
+        ESP_LOGI("MPD_PARSER", "Parsing line: %s", line);
+
+        // Parse Title
         if (strncmp(line, "Title: ", 7) == 0) {
             strncpy(song->title, line + 7, sizeof(song->title) - 1);
-        } else if (strncmp(line, "Artist: ", 8) == 0) {
+            song->title[sizeof(song->title) - 1] = '\0';  // Ensure null termination
+        }
+        // Parse Artist
+        else if (strncmp(line, "Artist: ", 8) == 0) {
             strncpy(song->artist, line + 8, sizeof(song->artist) - 1);
-        } else if (strncmp(line, "Album: ", 7) == 0) {
+            song->artist[sizeof(song->artist) - 1] = '\0';  // Ensure null termination
+        }
+        // Parse Album
+        else if (strncmp(line, "Album: ", 7) == 0) {
             strncpy(song->album, line + 7, sizeof(song->album) - 1);
-        } else if (strncmp(line, "file: ", 6) == 0) {
+            song->album[sizeof(song->album) - 1] = '\0';  // Ensure null termination
+        }
+        // Parse File path
+        else if (strncmp(line, "file: ", 6) == 0) {
             strncpy(song->file, line + 6, sizeof(song->file) - 1);
-        } else if (sscanf(line, "Time: %u", &song->duration) == 1) {
-            // Duration parsed
-        } else if (sscanf(line, "Pos: %hu", &song->position) == 1) {
-            // Position parsed
-        } else if (sscanf(line, "Id: %hu", &song->id) == 1) {
-            // ID parsed
+            song->file[sizeof(song->file) - 1] = '\0';  // Ensure null termination
+        }
+        // Parse Duration (floating point)
+        else if (sscanf(line, "duration: %f", &song->duration) == 1) {
+            // Duration parsed successfully
+        }
+        // Parse Position (integer)
+        else if (sscanf(line, "Pos: %hu", &song->position) == 1) {
+            // Position parsed successfully
+        }
+        // Parse ID (integer)
+        else if (sscanf(line, "Id: %hu", &song->id) == 1) {
+            // ID parsed successfully
         }
 
-        // Get the next line
+        // Get the next line by calling strtok with NULL
         line = strtok(NULL, "\n");
     }
+
+    // Print the final parsed song info for debugging
+    ESP_LOGI("MPD_PARSER", "Parsed Song - Title: %s, Artist: %s, Album: %s, File: %s, Duration: %f, Pos: %hu, Id: %hu",
+             song->title, song->artist, song->album, song->file, song->duration, song->position, song->id);
 }
+
 
 mpd_song_t mpd_get_currentsong()
 {

@@ -16,6 +16,10 @@
     "files.associations": {
         "nvs_flash.h": "c",
         "esp_event.h": "c",
-        "mpd.h": "c"
+        "mpd.h": "c",
+        "lv_example_pub.h": "c",
+        "cstdlib": "c",
+        "*.tcc": "c",
+        "fstream": "c"
     }
 }

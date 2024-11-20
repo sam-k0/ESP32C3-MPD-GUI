@@ -8,7 +8,7 @@
 
 #define WIFI_SSID "Bagger 244"
 #define WIFI_PASSWORD "am0gu$$y69"
-#define MPD_HOST "172.28.172.1"
+#define MPD_HOST "192.168.178.83"
 #define MPD_PORT 6600
 
 static char mpd_resp_buf[512];
@@ -38,7 +38,7 @@ typedef struct {
     uint16_t bitrate;      // Current bitrate in kbps (unsigned)
 } mpd_status_t;
 
-// Represents a song in the MPD playlist
+// Currentsong
 typedef struct {
     char title[128];      // Song title
     char artist[128];     // Artist name

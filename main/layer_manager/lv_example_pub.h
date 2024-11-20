@@ -61,6 +61,9 @@ extern "C" {
 #define COLOUR_GREY_4F          0x4F4F4F
 
 extern lv_layer_t home_layer;
+extern lv_layer_t volume_layer;
+
+LV_FONT_DECLARE(comicsans)
 
 extern void ui_obj_to_encoder_init(void);
 
