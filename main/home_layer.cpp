@@ -1,5 +1,5 @@
 
-#include "lv_example_pub.h"
+
 #include "lvgl.h"
 #include <stdio.h>
 #include "esp_system.h"
@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #endif
 
+#include "lv_example_pub.h"
 
 
 static bool main_layer_enter_cb(void *layer);
@@ -28,7 +29,6 @@ static time_out_count time_100ms, time_500ms;
 static lv_obj_t *page;
 static lv_obj_t *label_name;
 
-
 static void menu_event_cb(lv_event_t *e)
 {
     static uint8_t forbidden_sec_trigger = false;
@@ -41,13 +41,18 @@ static void menu_event_cb(lv_event_t *e)
         uint32_t key = lv_event_get_key(e);
         if (is_time_out(&time_100ms)) {
             // Knob rotate controls
-            ESP_LOGI("home_layer", "key: %d", key);
+            if (LV_KEY_RIGHT == key) {
+                lv_obj_set_style_text_color(label_name, lv_color_make(0x00, 0xff, 0x00), 0);
+            } else if (LV_KEY_LEFT == key) {
+                lv_obj_set_style_text_color(label_name, lv_color_make(0x00, 0xff, 0x00), 0);
+            }
         }
         feed_clock_time();
 
     } else if (LV_EVENT_CLICKED == code) {
         if (false == forbidden_sec_trigger) {
-           ESP_LOGI("home_layer", "pressed:");
+           // set color to red
+            lv_obj_set_style_text_color(label_name, lv_color_make(0xff, 0xff, 0x00), 0);
         } else {
             forbidden_sec_trigger = false;
         }
@@ -74,7 +79,8 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_add_event_cb(page, menu_event_cb, LV_EVENT_KEY, NULL);
     lv_obj_add_event_cb(page, menu_event_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(page, menu_event_cb, LV_EVENT_LONG_PRESSED, NULL);
-    ui_add_obj_to_encoder_group(page);
+    
+    lv_group_add_obj(lv_group_get_default(), page);
 }
 
 static bool main_layer_enter_cb(void *layer)

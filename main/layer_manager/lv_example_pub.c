@@ -24,6 +24,7 @@ void ui_add_obj_to_encoder_group(lv_obj_t *obj)
     lv_group_add_obj(group, obj);
 }
 
+
 void ui_remove_all_objs_from_encoder_group(void)
 {
     lv_group_remove_all_objs(group);
