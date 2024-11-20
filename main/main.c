@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "bsp/esp-bsp.h"
 
+#include "lv_example_pub.h"
 #include "mpd.h"
 
 static const char *TAG = "main";
@@ -25,9 +26,12 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(err);
 
-    bsp_display_start();
+    bsp_display_start(); // Initialize display
+    ui_obj_to_encoder_init(); // Initialize encoder
+    lv_create_home(&home_layer); // Create home layer
     bsp_display_unlock();
 
-    
+    vTaskDelay(pdMS_TO_TICKS(500));
+    bsp_display_backlight_on();
     wifi_init_sta();
 }

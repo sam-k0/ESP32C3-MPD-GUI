@@ -60,11 +60,7 @@ extern "C" {
 #define COLOUR_GREY_8F          0x8F8F8F
 #define COLOUR_GREY_4F          0x4F4F4F
 
-extern lv_layer_t menu_layer;
-//extern lv_layer_t washing_Layer;
-extern lv_layer_t light_2color_Layer;
-extern lv_layer_t thermostat_Layer;
-extern lv_layer_t song_Layer;
+extern lv_layer_t home_layer;
 
 extern void ui_obj_to_encoder_init(void);
 
