@@ -14,8 +14,12 @@
 static bool main_layer_enter_cb(void *layer);
 static bool main_layer_exit_cb(void *layer);
 static void main_layer_timer_cb(lv_timer_t *tmr);
+// UI Callbacks
 static void menu_event_cb(lv_event_t *e);
 static void play_pause_event_cb(lv_event_t *e);
+static void next_event_cb(lv_event_t *e);
+static void prev_event_cb(lv_event_t *e);
+static void switchmode_event_cb(lv_event_t *e);
 
 lv_layer_t home_layer = {
     .lv_obj_name    = "home_layer",
@@ -36,10 +40,12 @@ static lv_obj_t *label_artist;
 static lv_obj_t *btn_prev;
 static lv_obj_t *btn_play_pause;
 static lv_obj_t *btn_next;
+static lv_obj_t *btn_switchmode;
 
 static lv_obj_t *label_play_pause;
 static lv_obj_t *label_prev;
 static lv_obj_t *label_next;
+static lv_obj_t *label_switchmode;
 
 
 static void play_pause_event_cb(lv_event_t *e)
@@ -51,14 +57,40 @@ static void play_pause_event_cb(lv_event_t *e)
         ESP_LOGI("play_pause_event_cb", "Pausing");
         mpd_pause();
         // Set label to paused
+        lv_label_set_text(label_name, "Paused");
         lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
     } else {
         ESP_LOGI("play_pause_event_cb", "Playing");
         mpd_play();
         // Set label to play
+        lv_label_set_text(label_name, "Playing");
         lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
     }
 }
+
+static void next_event_cb(lv_event_t *e)
+{
+    // Handle click event
+    ESP_LOGI("next_event_cb", "LV_EVENT_CLICKED in next_event_cb");
+    mpd_next();
+}
+
+static void prev_event_cb(lv_event_t *e)
+{
+    // Handle click event
+    ESP_LOGI("prev_event_cb", "LV_EVENT_CLICKED in prev_event_cb");
+    mpd_prev();
+}
+
+static void switchmode_event_cb(lv_event_t *e)
+{
+    // Go to volume layer
+    ESP_LOGI("switchmode_event_cb", "LV_EVENT_CLICKED in switchmode_event_cb");
+    //ui_remove_all_objs_from_encoder_group();
+    //lv_func_goto_layer(&volume_layer);
+
+}
+
 
 static void menu_event_cb(lv_event_t *e)
 {
@@ -83,11 +115,11 @@ static void menu_event_cb(lv_event_t *e)
         feed_clock_time();
 
     } else if (LV_EVENT_LONG_PRESSED == code) {
-        forbidden_sec_trigger = true;
+        /*forbidden_sec_trigger = true;
         ESP_LOGI("menu_event_cb", "LV_EVENT_LONG_PRESSED");
         lv_indev_wait_release(lv_indev_get_next(NULL));
         ui_remove_all_objs_from_encoder_group();
-        lv_func_goto_layer(&volume_layer);
+        lv_func_goto_layer(&volume_layer);*/
 
         
     } else if (LV_EVENT_CLICKED == code) {
@@ -107,12 +139,12 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_set_size(page, LV_HOR_RES, LV_VER_RES);
 
     label_name = lv_label_create(page);
-    lv_label_set_text(label_name, "Home");
+    lv_label_set_text(label_name, "Paused");
     // Set text color to red
     lv_obj_set_style_text_color(label_name, lv_color_make(0xff, 0x00, 0x00), 0);
     lv_obj_set_width(label_name, 150);
     lv_obj_set_style_text_align(label_name, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(label_name, LV_ALIGN_BOTTOM_MID, 0, -6);
+    lv_obj_align(label_name, LV_ALIGN_BOTTOM_MID, 0, 5);
 
     // Display song name and artist in the middle of the screen
     label_songname = lv_label_create(page);
@@ -131,7 +163,7 @@ void ui_menu_init(lv_obj_t *parent)
     // Buttons for prev, play/pause, next
     btn_prev = lv_btn_create(page);
     lv_obj_set_size(btn_prev, 30, 30);
-    lv_obj_align(btn_prev, LV_ALIGN_BOTTOM_LEFT, 15, -15);
+    lv_obj_align(btn_prev, LV_ALIGN_BOTTOM_LEFT, 25, -15);
     label_prev = lv_label_create(btn_prev);
     lv_label_set_text(label_prev, LV_SYMBOL_PREV);
     // set label centered to the button
@@ -145,9 +177,15 @@ void ui_menu_init(lv_obj_t *parent)
 
     btn_next = lv_btn_create(page);
     lv_obj_set_size(btn_next, 30, 30);
-    lv_obj_align(btn_next, LV_ALIGN_BOTTOM_RIGHT, -15, -15);
+    lv_obj_align(btn_next, LV_ALIGN_BOTTOM_RIGHT, -25, -15);
     label_next = lv_label_create(btn_next);
     lv_label_set_text(label_next, LV_SYMBOL_NEXT);
+
+    btn_switchmode = lv_btn_create(page);
+    lv_obj_set_size(btn_switchmode, 30, 30);
+    lv_obj_align(btn_switchmode, LV_ALIGN_TOP_RIGHT, -25, 15);
+    label_switchmode = lv_label_create(btn_switchmode);
+    lv_label_set_text(label_switchmode, LV_SYMBOL_REFRESH);
 
 
 
@@ -161,9 +199,16 @@ void ui_menu_init(lv_obj_t *parent)
     lv_group_add_obj(lv_group_get_default(), btn_prev);
     lv_group_add_obj(lv_group_get_default(), btn_play_pause);
     lv_group_add_obj(lv_group_get_default(), btn_next);
+    lv_group_add_obj(lv_group_get_default(), btn_switchmode);
 
     // callback for play/pause button
     lv_obj_add_event_cb(btn_play_pause, play_pause_event_cb, LV_EVENT_CLICKED, NULL);
+    // callback for next button
+    lv_obj_add_event_cb(btn_next, next_event_cb, LV_EVENT_CLICKED, NULL);
+    // callback for prev button
+    lv_obj_add_event_cb(btn_prev, prev_event_cb, LV_EVENT_CLICKED, NULL);
+    // callback for switchmode button
+    lv_obj_add_event_cb(btn_switchmode, switchmode_event_cb, LV_EVENT_CLICKED, NULL);
 }
 
 static bool main_layer_enter_cb(void *layer)
@@ -196,6 +241,7 @@ static bool main_layer_exit_cb(void *layer)
     return true;
 }
 
+// Updates ui based on mpd status
 static void main_layer_timer_cb(lv_timer_t *tmr)
 {
     feed_clock_time();
@@ -213,8 +259,10 @@ static void main_layer_timer_cb(lv_timer_t *tmr)
         // update play/pause button
         if (status.state == MPD_STATE_PLAY) {
             lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
+            lv_label_set_text(label_name, "Playing");
         } else {
             lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
+            lv_label_set_text(label_name, "Paused");
         }
     
     
