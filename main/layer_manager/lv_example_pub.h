@@ -64,6 +64,7 @@ extern lv_layer_t home_layer;
 extern lv_layer_t volume_layer;
 
 LV_FONT_DECLARE(comicsans)
+LV_IMG_DECLARE(img_main_bg)
 
 extern void ui_obj_to_encoder_init(void);
 

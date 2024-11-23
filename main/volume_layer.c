@@ -66,13 +66,19 @@ void ui_volume_init(lv_obj_t *parent)
     page = lv_obj_create(parent);
     lv_obj_set_size(page, LV_HOR_RES, LV_VER_RES);
 
+    // Set background image
+    lv_obj_t *img = lv_img_create(page);
+    lv_img_set_src(img, &img_main_bg);
+    lv_img_set_zoom(img, 512);
+    lv_obj_align(img, LV_ALIGN_LEFT_MID, 7,0);
+
     label_name = lv_label_create(page);
     lv_label_set_text(label_name, "Volume");
     // Set text color to red
     lv_obj_set_style_text_color(label_name, lv_color_make(0xff, 0x00, 0x00), 0);
     lv_obj_set_width(label_name, 150);
     lv_obj_set_style_text_align(label_name, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(label_name, LV_ALIGN_BOTTOM_MID, 0, -6);
+    lv_obj_align(label_name, LV_ALIGN_CENTER, 0, 0);
 
     // Roller for volume control
     roller_volume = lv_roller_create(page);

@@ -9,6 +9,7 @@
 
 #include "lv_example_pub.h"
 #include "mpd.h"
+//#include "bg.h"
 
 
 static bool main_layer_enter_cb(void *layer);
@@ -20,6 +21,7 @@ static void play_pause_event_cb(lv_event_t *e);
 static void next_event_cb(lv_event_t *e);
 static void prev_event_cb(lv_event_t *e);
 static void switchmode_event_cb(lv_event_t *e);
+static void button_scroll_event_cb(lv_event_t *e);
 
 lv_layer_t home_layer = {
     .lv_obj_name    = "home_layer",
@@ -40,6 +42,9 @@ static lv_obj_t *label_songname;
 static lv_obj_t *label_artist;
 static lv_obj_t *label_time;
 
+// BG image
+static lv_obj_t *img;
+
 // Buttons for prev, play/pause, next
 static lv_obj_t *btn_prev;
 static lv_obj_t *btn_play_pause;
@@ -55,6 +60,7 @@ static lv_obj_t *label_switchmode;
 
 mpd_song_t *song_home = NULL;
 mpd_status_t* status_home = NULL;
+const char* audio_symbols[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX};
 
 // helper functions
 inline uint8_t time_get_minutes(uint32_t duration)
@@ -113,6 +119,23 @@ static void switchmode_event_cb(lv_event_t *e)
 
 }
 
+static void button_scroll_event_cb(lv_event_t *e)
+{
+    static lv_style_t style_btn;
+    lv_style_init(&style_btn);
+    lv_style_set_bg_color(&style_btn, lv_color_make(0x8e, 0xbf, 0xed)); // Set background color to blue
+    lv_style_set_bg_opa(&style_btn, LV_OPA_COVER); // Set opacity to fully opaque
+
+    // Handle selected / deselected event
+    if (LV_EVENT_FOCUSED == lv_event_get_code(e)) {
+        // Set style to selected
+        lv_obj_add_style(lv_event_get_target(e), &style_btn, 0);
+    } else if (LV_EVENT_DEFOCUSED == lv_event_get_code(e)) {
+        // Remove style
+        lv_obj_remove_style(lv_event_get_target(e), &style_btn, 0);
+    }
+}
+
 // Method to update play/pause button
 void update_play_pause_button()
 {
@@ -135,6 +158,14 @@ void update_play_pause_button()
     snprintf(time_str, sizeof(time_str), "%02d:%02d / %02d:%02d", time_get_minutes(status_home->elapsed), time_get_seconds(status_home->elapsed), time_get_minutes(status_home->duration), time_get_seconds(status_home->duration));
     lv_label_set_text(label_time, time_str);
 
+    // Update audio button symbol by calculating the index of 2 symbols
+    uint8_t index = 0;
+    if (status_home->volume == 0) {
+        lv_label_set_text(label_switchmode, LV_SYMBOL_MUTE);
+    } else {
+        index = status_home->volume / 50;
+        lv_label_set_text(label_switchmode, audio_symbols[index]);
+    }
     free(status_home);
 }
 
@@ -184,10 +215,17 @@ void ui_menu_init(lv_obj_t *parent)
     page = lv_obj_create(parent);
     lv_obj_set_size(page, LV_HOR_RES, LV_VER_RES);
 
+    // Set background image
+    lv_obj_t *img = lv_img_create(page);
+    lv_img_set_src(img, &img_main_bg);
+    lv_img_set_zoom(img, 512);
+    lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
+
+
     label_name = lv_label_create(page);
     lv_label_set_text(label_name, "Paused");
-    // Set text color to red
-    lv_obj_set_style_text_color(label_name, lv_color_make(0xff, 0x00, 0x00), 0);
+    
+    lv_obj_set_style_text_color(label_name, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_width(label_name, 150);
     lv_obj_set_style_text_align(label_name, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_name, LV_ALIGN_BOTTOM_MID, 0, 5);
@@ -196,51 +234,55 @@ void ui_menu_init(lv_obj_t *parent)
     label_songname = lv_label_create(page);
     lv_label_set_text(label_songname, "Song Name");
     lv_obj_set_style_text_font(label_songname, &comicsans, 0);
-    lv_obj_set_style_text_color(label_songname, lv_color_make(0x00, 0x00, 0x00), 0);
+    lv_obj_set_style_text_color(label_songname, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_songname, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_songname, LV_ALIGN_CENTER, 0, -20);
 
     label_artist = lv_label_create(page);
     lv_label_set_text(label_artist, "Artist");
-    lv_obj_set_style_text_color(label_artist, lv_color_make(0x00, 0x00, 0x00), 0);
+    lv_obj_set_style_text_color(label_artist, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_artist, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_artist, LV_ALIGN_CENTER, 0, 10);
 
     label_time = lv_label_create(page);
     lv_label_set_text(label_time, "00:00 / 00:00");
-    lv_obj_set_style_text_color(label_time, lv_color_make(0x00, 0x00, 0x00), 0);
+    lv_obj_set_style_text_color(label_time, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_time, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_time, LV_ALIGN_CENTER, 0, 30);
 
     // Buttons for prev, play/pause, next
+
     btn_prev = lv_btn_create(page);
     lv_obj_set_size(btn_prev, 30, 30);
     lv_obj_align(btn_prev, LV_ALIGN_BOTTOM_LEFT, 25, -15);
     label_prev = lv_label_create(btn_prev);
     lv_label_set_text(label_prev, LV_SYMBOL_PREV);
-    // set label centered to the button
     lv_obj_set_style_text_align(label_prev, LV_TEXT_ALIGN_CENTER, 0);
-    
+
+
+
     btn_play_pause = lv_btn_create(page);
     lv_obj_set_size(btn_play_pause, 30, 30);
     lv_obj_align(btn_play_pause, LV_ALIGN_BOTTOM_MID, -30, -10);
     label_play_pause = lv_label_create(btn_play_pause);
     lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
+    lv_obj_set_style_text_align(label_play_pause, LV_TEXT_ALIGN_CENTER, 0);
+
 
     btn_switchmode = lv_btn_create(page);
     lv_obj_set_size(btn_switchmode, 30, 30);
     lv_obj_align(btn_switchmode, LV_ALIGN_BOTTOM_MID, 30, -10);
     label_switchmode = lv_label_create(btn_switchmode);
-    lv_label_set_text(label_switchmode, LV_SYMBOL_REFRESH);
+    lv_label_set_text(label_switchmode, LV_SYMBOL_VOLUME_MAX);
+    lv_obj_set_style_text_align(label_switchmode, LV_TEXT_ALIGN_CENTER, 0);
 
     btn_next = lv_btn_create(page);
     lv_obj_set_size(btn_next, 30, 30);
     lv_obj_align(btn_next, LV_ALIGN_BOTTOM_RIGHT, -25, -15);
     label_next = lv_label_create(btn_next);
     lv_label_set_text(label_next, LV_SYMBOL_NEXT);
+    lv_obj_set_style_text_align(label_next, LV_TEXT_ALIGN_CENTER, 0);
 
-
-    
     // Groups
     lv_group_add_obj(lv_group_get_default(), btn_prev);
     lv_group_add_obj(lv_group_get_default(), btn_play_pause);
@@ -256,6 +298,20 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_add_event_cb(btn_prev, prev_event_cb, LV_EVENT_CLICKED, NULL);
     // callback for switchmode button
     lv_obj_add_event_cb(btn_switchmode, switchmode_event_cb, LV_EVENT_CLICKED, NULL);
+
+    // Scroll event for focused and defocused
+
+    lv_obj_add_event_cb(btn_prev, button_scroll_event_cb, LV_EVENT_FOCUSED, NULL);
+    lv_obj_add_event_cb(btn_prev, button_scroll_event_cb, LV_EVENT_DEFOCUSED, NULL);
+
+    lv_obj_add_event_cb(btn_play_pause, button_scroll_event_cb, LV_EVENT_FOCUSED, NULL);
+    lv_obj_add_event_cb(btn_play_pause, button_scroll_event_cb, LV_EVENT_DEFOCUSED, NULL);
+
+    lv_obj_add_event_cb(btn_next, button_scroll_event_cb, LV_EVENT_FOCUSED, NULL);
+    lv_obj_add_event_cb(btn_next, button_scroll_event_cb, LV_EVENT_DEFOCUSED, NULL);
+
+    lv_obj_add_event_cb(btn_switchmode, button_scroll_event_cb, LV_EVENT_FOCUSED, NULL);
+    lv_obj_add_event_cb(btn_switchmode, button_scroll_event_cb, LV_EVENT_DEFOCUSED, NULL);
 
     // Set play/pause button as default
     lv_group_focus_obj(btn_play_pause);
