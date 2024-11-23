@@ -36,14 +36,16 @@ typedef struct {
     uint16_t song;         // Current song index (unsigned)
     uint32_t elapsed;      // Elapsed time in seconds (unsigned, fits in uint32_t)
     uint16_t bitrate;      // Current bitrate in kbps (unsigned)
+    uint32_t duration;     // Duration of the current song in seconds
 } mpd_status_t;
 
 // Currentsong
 typedef struct {
     char title[128];      // Song title
     char artist[128];     // Artist name
-    char album[128];      // Album name
+    char album[128];      // Album name // unused
     char file[256];       // File path
+    // unused
     uint32_t duration;    // Duration in seconds
     uint16_t position;    // Position in the playlist
     uint16_t id;          // Song ID
@@ -52,6 +54,8 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data);
@@ -71,11 +75,11 @@ int connect_send_close(const char* ip_addr, uint16_t port, const char *cmd, char
 
 // Wrapper for the MPD status command
 bool parse_mpd_status(const char *response, mpd_status_t *status);
-mpd_status_t mpd_get_status();
+void mpd_get_status(mpd_status_t* status);
 
 // Wrapper for the MPD currentsong command
 void parse_mpd_currentsong(const char *response, mpd_song_t *song);
-mpd_song_t mpd_get_currentsong();
+void mpd_get_currentsong(mpd_song_t *song);
 
 // Simple commands
 int mpd_set_volume(int volume);
@@ -83,6 +87,7 @@ int mpd_play();
 int mpd_pause();
 int mpd_next();
 int mpd_prev();
+
 
 
 #ifdef __cplusplus

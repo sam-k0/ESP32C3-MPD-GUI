@@ -32,10 +32,14 @@ lv_layer_t home_layer = {
 };
 
 static time_out_count time_100ms, time_500ms, time_2000ms;
+
+
 static lv_obj_t *page;
 static lv_obj_t *label_name;
 static lv_obj_t *label_songname;
 static lv_obj_t *label_artist;
+static lv_obj_t *label_time;
+
 // Buttons for prev, play/pause, next
 static lv_obj_t *btn_prev;
 static lv_obj_t *btn_play_pause;
@@ -48,12 +52,29 @@ static lv_obj_t *label_next;
 static lv_obj_t *label_switchmode;
 
 
+
+mpd_song_t *song_home = NULL;
+mpd_status_t* status_home = NULL;
+
+// helper functions
+inline uint8_t time_get_minutes(uint32_t duration)
+{
+    return duration / 60;
+}
+
+inline uint8_t time_get_seconds(uint32_t duration)
+{
+    return duration % 60;
+}
+
 static void play_pause_event_cb(lv_event_t *e)
 {
     // Handle click event
     ESP_LOGI("play_pause_event_cb", "LV_EVENT_CLICKED in play_pause_event_cb");
-    mpd_status_t status = mpd_get_status();
-    if (status.state == MPD_STATE_PLAY) {
+
+    status_home = malloc(sizeof(mpd_status_t));
+    mpd_get_status(status_home);
+    if (status_home->state == MPD_STATE_PLAY) {
         ESP_LOGI("play_pause_event_cb", "Pausing");
         mpd_pause();
         // Set label to paused
@@ -66,6 +87,7 @@ static void play_pause_event_cb(lv_event_t *e)
         lv_label_set_text(label_name, "Playing");
         lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
     }
+    free(status_home);
 }
 
 static void next_event_cb(lv_event_t *e)
@@ -86,11 +108,35 @@ static void switchmode_event_cb(lv_event_t *e)
 {
     // Go to volume layer
     ESP_LOGI("switchmode_event_cb", "LV_EVENT_CLICKED in switchmode_event_cb");
-    //ui_remove_all_objs_from_encoder_group();
-    //lv_func_goto_layer(&volume_layer);
+    ui_remove_all_objs_from_encoder_group();
+    lv_func_goto_layer(&volume_layer);
 
 }
 
+// Method to update play/pause button
+void update_play_pause_button()
+{
+    status_home = malloc(sizeof(mpd_status_t));
+    mpd_get_status(status_home);
+
+    ESP_LOGI("elapsed", "Elapsed: %d", status_home->elapsed);
+    ESP_LOGI("duration", "Duration: %d", status_home->duration);
+
+    if (status_home->state == MPD_STATE_PLAY) {
+        lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
+        lv_label_set_text(label_name, "Playing");
+    } else {
+        lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
+        lv_label_set_text(label_name, "Paused");
+    }
+
+    // Update time
+    char time_str[20];
+    snprintf(time_str, sizeof(time_str), "%02d:%02d / %02d:%02d", time_get_minutes(status_home->elapsed), time_get_seconds(status_home->elapsed), time_get_minutes(status_home->duration), time_get_seconds(status_home->duration));
+    lv_label_set_text(label_time, time_str);
+
+    free(status_home);
+}
 
 static void menu_event_cb(lv_event_t *e)
 {
@@ -160,6 +206,12 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_set_style_text_align(label_artist, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_artist, LV_ALIGN_CENTER, 0, 10);
 
+    label_time = lv_label_create(page);
+    lv_label_set_text(label_time, "00:00 / 00:00");
+    lv_obj_set_style_text_color(label_time, lv_color_make(0x00, 0x00, 0x00), 0);
+    lv_obj_set_style_text_align(label_time, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(label_time, LV_ALIGN_CENTER, 0, 30);
+
     // Buttons for prev, play/pause, next
     btn_prev = lv_btn_create(page);
     lv_obj_set_size(btn_prev, 30, 30);
@@ -171,9 +223,15 @@ void ui_menu_init(lv_obj_t *parent)
     
     btn_play_pause = lv_btn_create(page);
     lv_obj_set_size(btn_play_pause, 30, 30);
-    lv_obj_align(btn_play_pause, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_align(btn_play_pause, LV_ALIGN_BOTTOM_MID, -30, -10);
     label_play_pause = lv_label_create(btn_play_pause);
     lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
+
+    btn_switchmode = lv_btn_create(page);
+    lv_obj_set_size(btn_switchmode, 30, 30);
+    lv_obj_align(btn_switchmode, LV_ALIGN_BOTTOM_MID, 30, -10);
+    label_switchmode = lv_label_create(btn_switchmode);
+    lv_label_set_text(label_switchmode, LV_SYMBOL_REFRESH);
 
     btn_next = lv_btn_create(page);
     lv_obj_set_size(btn_next, 30, 30);
@@ -181,25 +239,14 @@ void ui_menu_init(lv_obj_t *parent)
     label_next = lv_label_create(btn_next);
     lv_label_set_text(label_next, LV_SYMBOL_NEXT);
 
-    btn_switchmode = lv_btn_create(page);
-    lv_obj_set_size(btn_switchmode, 30, 30);
-    lv_obj_align(btn_switchmode, LV_ALIGN_TOP_RIGHT, -25, 15);
-    label_switchmode = lv_label_create(btn_switchmode);
-    lv_label_set_text(label_switchmode, LV_SYMBOL_REFRESH);
 
-
-
-    // Callbacks for knob rotate controls
-    /*lv_obj_add_event_cb(page, menu_event_cb, LV_EVENT_FOCUSED, NULL);
-    lv_obj_add_event_cb(page, menu_event_cb, LV_EVENT_KEY, NULL);
-    lv_obj_add_event_cb(page, menu_event_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_event_cb(page, menu_event_cb, LV_EVENT_LONG_PRESSED, NULL);*/
     
-    //lv_group_add_obj(lv_group_get_default(), page);
+    // Groups
     lv_group_add_obj(lv_group_get_default(), btn_prev);
     lv_group_add_obj(lv_group_get_default(), btn_play_pause);
-    lv_group_add_obj(lv_group_get_default(), btn_next);
     lv_group_add_obj(lv_group_get_default(), btn_switchmode);
+    lv_group_add_obj(lv_group_get_default(), btn_next);
+
 
     // callback for play/pause button
     lv_obj_add_event_cb(btn_play_pause, play_pause_event_cb, LV_EVENT_CLICKED, NULL);
@@ -209,6 +256,12 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_add_event_cb(btn_prev, prev_event_cb, LV_EVENT_CLICKED, NULL);
     // callback for switchmode button
     lv_obj_add_event_cb(btn_switchmode, switchmode_event_cb, LV_EVENT_CLICKED, NULL);
+
+    // Set play/pause button as default
+    lv_group_focus_obj(btn_play_pause);
+
+    // update play/pause button
+    //update_play_pause_button();
 }
 
 static bool main_layer_enter_cb(void *layer)
@@ -251,37 +304,42 @@ static void main_layer_timer_cb(lv_timer_t *tmr)
         
         ESP_LOGI("main_layer_timer_cb", "Timer callback");
 
-        mpd_status_t status = mpd_get_status();
-        // Print status
-        /*ESP_LOGI("MPD_PARSER", "Parsed Status - Volume: %d, Repeat: %d, Random: %d, Single: %d, Consume: %d, Playlist: %hu, Playlist Length: %hu, State: %d, Song: %hu, Elapsed: %u, Bitrate: %hu",
-             status.volume, status.repeat, status.random, status.single, status.consume, status.playlist, status.playlistlength, status.state, status.song, status.elapsed, status.bitrate);
-        */
-        // update play/pause button
-        if (status.state == MPD_STATE_PLAY) {
-            lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
-            lv_label_set_text(label_name, "Playing");
-        } else {
-            lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
-            lv_label_set_text(label_name, "Paused");
+        // Update play/pause button
+        update_play_pause_button();
+
+        song_home = malloc(sizeof(mpd_song_t));
+        mpd_get_currentsong(song_home);
+        ESP_LOGI("main_layer_timer_cb", "Song: %s", song_home->title);
+        ESP_LOGI("main_layer_timer_cb", "Artist: %s", song_home->artist);
+        ESP_LOGI("main_layer_timer_cb", "file: %s", song_home->file);
+
+        // Update song name and artist
+        if(song_home->title[0] == '\0')
+        {
+            if(song_home->file[0] != '\0')
+            {
+                lv_label_set_text(label_songname, song_home->file);
+            }
+            else
+            {
+                lv_label_set_text(label_songname, "No Song");
+            }
         }
-    
-    
+        else
+        {
+            lv_label_set_text(label_songname, song_home->title);
+        }
 
+        // Check if artist is empty string
+        if(song_home->artist[0] == '\0')
+        {
+            lv_label_set_text(label_artist, "Unknown Artist");
+        }
+        else
+        {
+            lv_label_set_text(label_artist, song_home->artist);
+        }
 
-
-        // Update the song name and artist
-
-        //connect_send_close(MPD_HOST, MPD_PORT, "currentsong\n", mpd_resp_buf, sizeof(mpd_resp_buf));
-        //mpd_song_t song = mpd_get_currentsong();
-        //lv_label_set_text(label_songname, song.title);
-        //lv_label_set_text(label_artist, song.artist);
-
-        //const char* test_string = "file: Camellia-Feelin_Sky-WPNUBDRoxgy7W48GBXZ.mp3\nLast-Modified: 2024-11-20T16:30:21Z\nFormat: 44100:24:2\nArtist: Camellia\nTitle: Feelin Sky\nAlbum: Feelin Sky\nTime: 362\nduration: 362.213\nPos: 0\nId: 13\nOK\n";
-
-        /*mpd_song_t song;
-        parse_mpd_currentsong(test_string, &song);
-        //song = mpd_get_currentsong();
-       ESP_LOGI("MPD_PARSER", "Parsed Song - Title: %s, Artist: %s, Album: %s, File: %s, Duration: %f, Pos: %hu, Id: %hu",
-             song.title, song.artist, song.album, song.file, song.duration, song.position, song.id);*/
+        free(song_home);
     }
 }

@@ -191,34 +191,36 @@ bool parse_mpd_status(const char *response, mpd_status_t *status) {
     char *line = strtok((char *)response, "\n");
     while (line != NULL) {
         if (sscanf(line, "volume: %hhd", &status->volume) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed volume: %d", status->volume);
+            //ESP_LOGI("MPD_PARSER", "Parsed volume: %d", status->volume);
         } else if (sscanf(line, "repeat: %hhd", (int8_t *)&status->repeat) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed repeat: %d", status->repeat);
+            //ESP_LOGI("MPD_PARSER", "Parsed repeat: %d", status->repeat);
         } else if (sscanf(line, "random: %hhd", (int8_t *)&status->random) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed random: %d", status->random);
+            //ESP_LOGI("MPD_PARSER", "Parsed random: %d", status->random);
         } else if (sscanf(line, "single: %hhd", (int8_t *)&status->single) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed single: %d", status->single);
+            //ESP_LOGI("MPD_PARSER", "Parsed single: %d", status->single);
         } else if (sscanf(line, "consume: %hhd", (int8_t *)&status->consume) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed consume: %d", status->consume);
+            //ESP_LOGI("MPD_PARSER", "Parsed consume: %d", status->consume);
         } else if (sscanf(line, "playlist: %hu", &status->playlist) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed playlist: %d", status->playlist);
+            //ESP_LOGI("MPD_PARSER", "Parsed playlist: %d", status->playlist);
         } else if (sscanf(line, "playlistlength: %hu", &status->playlistlength) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed playlist length: %d", status->playlistlength);
+            //ESP_LOGI("MPD_PARSER", "Parsed playlist length: %d", status->playlistlength);
         } else if (strncmp(line, "state: play", 11) == 0) {
             status->state = MPD_STATE_PLAY;
-            ESP_LOGI("MPD_PARSER", "Parsed state: play");
+            //ESP_LOGI("MPD_PARSER", "Parsed state: play");
         } else if (strncmp(line, "state: pause", 12) == 0) {
             status->state = MPD_STATE_PAUSE;
-            ESP_LOGI("MPD_PARSER", "Parsed state: pause");
+            //ESP_LOGI("MPD_PARSER", "Parsed state: pause");
         } else if (strncmp(line, "state: stop", 11) == 0) {
             status->state = MPD_STATE_STOP;
-            ESP_LOGI("MPD_PARSER", "Parsed state: stop");
+            //ESP_LOGI("MPD_PARSER", "Parsed state: stop");
         } else if (sscanf(line, "song: %hu", &status->song) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed song: %d", status->song);
+            //ESP_LOGI("MPD_PARSER", "Parsed song: %d", status->song);
         } else if (sscanf(line, "elapsed: %u", &status->elapsed) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed elapsed: %d", status->elapsed);
+            //ESP_LOGI("MPD_PARSER", "Parsed elapsed: %d", status->elapsed);
         } else if (sscanf(line, "bitrate: %hu", &status->bitrate) == 1) {
-            ESP_LOGI("MPD_PARSER", "Parsed bitrate: %d", status->bitrate);
+            //ESP_LOGI("MPD_PARSER", "Parsed bitrate: %d", status->bitrate);
+        }else if( sscanf(line, "duration: %u", &status->duration) == 1){
+            //ESP_LOGI("MPD_PARSER", "Parsed duration: %d", status->duration);
         }
 
         line = strtok(NULL, "\n");
@@ -226,88 +228,63 @@ bool parse_mpd_status(const char *response, mpd_status_t *status) {
     return true;
 }
 
-mpd_status_t mpd_get_status()
+void mpd_get_status(mpd_status_t* status)
 {
-    mpd_status_t status;
-    memset(&status, 0, sizeof(mpd_status_t));
     connect_send_close(MPD_HOST, MPD_PORT, "status\n", mpd_resp_buf, sizeof(mpd_resp_buf));
-    parse_mpd_status(mpd_resp_buf, &status);
-    return status;
+    parse_mpd_status(mpd_resp_buf, status);
 }
 
 // Parse the current song response
-void parse_mpd_currentsong(const char *response, mpd_song_t *song)
-{
-    if (response == NULL || song == NULL) {
-        ESP_LOGE("MPD_PARSER", "Invalid arguments to parse_mpd_currentsong.");
+void parse_mpd_currentsong(const char *response, mpd_song_t *song) {
+    if (!response || !song) {
+        fprintf(stderr, "Invalid arguments to parse_mpd_currentsong.\n");
         return;
     }
 
-    // Log the full response for debugging
-    ESP_LOGI("MPD_PARSER", "Response:\n%s", response);
+    // memset(song, 0, sizeof(mpd_song_t));
 
-    // Copy the response into a mutable buffer to avoid modifying the original string
-    char response_copy[512]; // Ensure this buffer is large enough to hold the response
-    strncpy(response_copy, response, sizeof(response_copy) - 1);
-    response_copy[sizeof(response_copy) - 1] = '\0'; // Null-terminate to be safe
+    char line_buffer[512]; // Temporary buffer for each line
+    const char *line_start = response;
+    const char *line_end;
 
-    // Use strtok to split the response into lines based on the newline character
-    char *line = strtok(response_copy, "\n");
+    // Initializte artist and title to empty strings
+    song->artist[0] = '\0';
+    song->title[0] = '\0';
+    song->file[0] = '\0';
 
-    // Parse the response line by line
-    while (line != NULL) {
-        ESP_LOGI("MPD_PARSER", "Parsing line: %s", line);
+    while ((line_end = strstr(line_start, "\n")) != NULL) {
+        size_t line_length = line_end - line_start;
 
-        // Parse Title
-        if (strncmp(line, "Title: ", 7) == 0) {
-            strncpy(song->title, line + 7, sizeof(song->title) - 1);
-            song->title[sizeof(song->title) - 1] = '\0';  // Ensure null termination
+        // Copy the line into a buffer and null-terminate it
+        if (line_length >= sizeof(line_buffer)) {
+            fprintf(stderr, "Line too long to process.\n");
+            break;
         }
-        // Parse Artist
-        else if (strncmp(line, "Artist: ", 8) == 0) {
-            strncpy(song->artist, line + 8, sizeof(song->artist) - 1);
-            song->artist[sizeof(song->artist) - 1] = '\0';  // Ensure null termination
-        }
-        // Parse Album
-        else if (strncmp(line, "Album: ", 7) == 0) {
-            strncpy(song->album, line + 7, sizeof(song->album) - 1);
-            song->album[sizeof(song->album) - 1] = '\0';  // Ensure null termination
-        }
-        // Parse File path
-        else if (strncmp(line, "file: ", 6) == 0) {
-            strncpy(song->file, line + 6, sizeof(song->file) - 1);
-            song->file[sizeof(song->file) - 1] = '\0';  // Ensure null termination
-        }
-        // Parse Duration (floating point)
-        else if (sscanf(line, "duration: %f", &song->duration) == 1) {
-            // Duration parsed successfully
-        }
-        // Parse Position (integer)
-        else if (sscanf(line, "Pos: %hu", &song->position) == 1) {
-            // Position parsed successfully
-        }
-        // Parse ID (integer)
-        else if (sscanf(line, "Id: %hu", &song->id) == 1) {
-            // ID parsed successfully
+        strncpy(line_buffer, line_start, line_length);
+        line_buffer[line_length] = '\0';
+
+        // Parse the line
+        if (strncmp(line_buffer, "file: ", 6) == 0) {
+            strncpy(song->file, line_buffer + 6, sizeof(song->file) - 1);
+            song->file[sizeof(song->file) - 1] = '\0'; // Ensure null termination
+        } else if (strncmp(line_buffer, "Artist: ", 8) == 0) {
+            strncpy(song->artist, line_buffer + 8, sizeof(song->artist) - 1);
+            song->artist[sizeof(song->artist) - 1] = '\0'; // Ensure null termination
+        } else if (strncmp(line_buffer, "Title: ", 7) == 0) {
+            strncpy(song->title, line_buffer + 7, sizeof(song->title) - 1);
+            song->title[sizeof(song->title) - 1] = '\0'; // Ensure null termination
         }
 
-        // Get the next line by calling strtok with NULL
-        line = strtok(NULL, "\n");
+        // Move to the next line
+        line_start = line_end + 1;
     }
-
-    // Print the final parsed song info for debugging
-    ESP_LOGI("MPD_PARSER", "Parsed Song - Title: %s, Artist: %s, Album: %s, File: %s, Duration: %f, Pos: %hu, Id: %hu",
-             song->title, song->artist, song->album, song->file, song->duration, song->position, song->id);
 }
 
 
-mpd_song_t mpd_get_currentsong()
+void mpd_get_currentsong(mpd_song_t *song)
 {
-    mpd_song_t song;
-    memset(&song, 0, sizeof(mpd_song_t));
     connect_send_close(MPD_HOST, MPD_PORT, "currentsong\n", mpd_resp_buf, sizeof(mpd_resp_buf));
-    parse_mpd_currentsong(mpd_resp_buf, &song);
-    return song;
+    parse_mpd_currentsong(mpd_resp_buf, song);
 }
 
 int mpd_set_volume(int volume)
@@ -326,6 +303,7 @@ int mpd_prev()
 {
     return connect_send_close(MPD_HOST, MPD_PORT, "previous\n", mpd_resp_buf, sizeof(mpd_resp_buf));
 }
+
 
 int mpd_play()
 {

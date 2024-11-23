@@ -11,7 +11,8 @@
 static bool volume_layer_enter_cb(void *layer);
 static bool volume_layer_exit_cb(void *layer);
 static void volume_layer_timer_cb(lv_timer_t *tmr);
-static void volume_event_cb(lv_event_t *e);
+// UI Callbacks
+static void volume_roller_event_cb(lv_event_t *e);
 
 lv_layer_t volume_layer = {
     .lv_obj_name    = "volume_layer",
@@ -23,48 +24,42 @@ lv_layer_t volume_layer = {
     .timer_cb       = volume_layer_timer_cb,
 };
 
-static time_out_count time_100ms, time_500ms;
+static time_out_count time_2000ms;
 static lv_obj_t *page;
 static lv_obj_t *label_name;
+static lv_obj_t *roller_volume;
+
+static uint8_t idle_counter = 0;
+mpd_status_t* status_volume = NULL;
 
 
-
-static void volume_event_cb(lv_event_t *e)
+static void volume_roller_event_cb(lv_event_t *e)
 {
-    static uint8_t forbidden_sec_trigger = false;
-
     lv_event_code_t code = lv_event_get_code(e);
 
-    if (LV_EVENT_FOCUSED == code) {
-        lv_group_set_editing(lv_group_get_default(), true);
-    } else if (LV_EVENT_KEY == code) {
-        uint32_t key = lv_event_get_key(e);
-        if (is_time_out(&time_100ms)) {
-            // Knob rotate controls
-            if (LV_KEY_RIGHT == key) {
-                lv_obj_set_style_text_color(label_name, lv_color_make(0x00, 0xff, 0x00), 0);
-            } else if (LV_KEY_LEFT == key) {
-                lv_obj_set_style_text_color(label_name, lv_color_make(0x00, 0xff, 0x00), 0);
-            }
-        }
-        feed_clock_time();
-
+    if (LV_EVENT_VALUE_CHANGED == code) {
+        // Get the current value of the roller
+        uint16_t value = lv_roller_get_selected(roller_volume);
+        ESP_LOGI("volume_roller_event_cb", "Volume: %d", value);
+        mpd_set_volume(value*10);
     } else if (LV_EVENT_CLICKED == code) {
-        if (false == forbidden_sec_trigger) {
-           // set color to red
-            lv_obj_set_style_text_color(label_name, lv_color_make(0xff, 0xff, 0x00), 0);
-        } else {
-            forbidden_sec_trigger = false;
-        }
-        feed_clock_time();
-    } else if (LV_EVENT_LONG_PRESSED == code) {
         // goto home layer
-        ESP_LOGI("AMOGUS", "Long pressed event");
+        ESP_LOGI("volume_roller_event_cb", "Clicked event: Returning to home layer");
         lv_indev_wait_release(lv_indev_get_next(NULL));
         ui_remove_all_objs_from_encoder_group();
         lv_func_goto_layer(&home_layer);
+    } else if (LV_EVENT_KEY == code) { // reset idle counter
+        uint32_t key = lv_event_get_key(e);
+        if (LV_KEY_RIGHT == key) {
+            idle_counter = 0;
+            ESP_LOGI("volume_roller_event_cb", "LV_KEY_RIGHT");
+        } else if (LV_KEY_LEFT == key) {
+            idle_counter = 0;
+            ESP_LOGI("volume_roller_event_cb", "LV_KEY_LEFT");
+        }
     }
 }
+
 
 void ui_volume_init(lv_obj_t *parent)
 {
@@ -79,13 +74,35 @@ void ui_volume_init(lv_obj_t *parent)
     lv_obj_set_style_text_align(label_name, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_name, LV_ALIGN_BOTTOM_MID, 0, -6);
 
-    // Callbacks for knob rotate controls
-    lv_obj_add_event_cb(page, volume_event_cb, LV_EVENT_FOCUSED, NULL);
-    lv_obj_add_event_cb(page, volume_event_cb, LV_EVENT_KEY, NULL);
-    lv_obj_add_event_cb(page, volume_event_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_event_cb(page, volume_event_cb, LV_EVENT_LONG_PRESSED, NULL);
-    
-    lv_group_add_obj(lv_group_get_default(), page);
+    // Roller for volume control
+    roller_volume = lv_roller_create(page);
+    lv_roller_set_options(roller_volume, "0\n10\n20\n30\n40\n50\n60\n70\n80\n90\n100", LV_ROLLER_MODE_NORMAL);
+    lv_roller_set_visible_row_count(roller_volume, 3);
+    lv_obj_align(roller_volume, LV_ALIGN_CENTER, 0, 0);
+
+    lv_obj_add_event_cb(roller_volume, volume_roller_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(roller_volume, volume_roller_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(roller_volume, volume_roller_event_cb, LV_EVENT_KEY, NULL);
+
+    lv_group_add_obj(lv_group_get_default(), roller_volume);
+    // Select the roller by default
+    lv_group_focus_obj(roller_volume);
+
+    // Get the current volume from MPD
+    status_volume = malloc(sizeof(mpd_status_t));
+    mpd_get_status(status_volume);
+
+    uint8_t overflow = status_volume->volume % 10;
+    uint8_t target = status_volume->volume - overflow;
+
+    free(status_volume);
+
+    if (target != 0){
+        target = target / 10; // calculate the value for the roller
+    }
+
+    // set the roller to the closest value
+    lv_roller_set_selected(roller_volume, target, LV_ANIM_OFF);
 }
 
 static bool volume_layer_enter_cb(void *layer)
@@ -104,8 +121,7 @@ static bool volume_layer_enter_cb(void *layer)
 
         ui_volume_init(create_layer->lv_obj_layer);
     }
-    set_time_out(&time_100ms, 200);
-    set_time_out(&time_500ms, 500);
+    set_time_out(&time_2000ms, 2000); // set timers
     feed_clock_time();
 
     return ret;
@@ -119,5 +135,29 @@ static bool volume_layer_exit_cb(void *layer)
 
 static void volume_layer_timer_cb(lv_timer_t *tmr)
 {
+    feed_clock_time();
+    if(is_time_out(&time_2000ms)) {
+        status_volume = malloc(sizeof(mpd_status_t));
+        mpd_get_status(status_volume); // Get volume from MPD
+        uint8_t overflow = status_volume->volume % 10;
+        uint8_t target = status_volume->volume - overflow;
+        free(status_volume);
+
+        if (target != 0){
+            target = target / 10; // calculate the value for the roller
+        }
+
+        if (idle_counter < 5)
+        {
+            idle_counter++;
+        }
+
+        // set the roller to the closest value
+        if (idle_counter >= 5) {
+            ESP_LOGI("volume_layer_timer_cb", "Setting volume to %d as user is idle", target);
+            lv_roller_set_selected(roller_volume, target, LV_ANIM_ON);
+        }
+    }
+
     return;
 }
