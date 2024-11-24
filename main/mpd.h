@@ -4,12 +4,9 @@
 #include "esp_system.h" //esp_init funtions esp_err_t 
 #include "esp_wifi.h" //esp_wifi_init functions and wifi operations
 #include "esp_event.h" //for wifi event
+#include "my_secrets.h"
 
 
-#define WIFI_SSID "Bagger 244"
-#define WIFI_PASSWORD "am0gu$$y69"
-#define MPD_HOST "192.168.178.83"
-#define MPD_PORT 6600
 
 static char mpd_resp_buf[512];
 // Define states as integer constants

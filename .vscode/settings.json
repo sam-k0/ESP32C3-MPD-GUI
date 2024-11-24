@@ -20,6 +20,7 @@
         "lv_example_pub.h": "c",
         "cstdlib": "c",
         "*.tcc": "c",
-        "fstream": "c"
+        "fstream": "c",
+        "my_secrets.h": "c"
     }
 }
