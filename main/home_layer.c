@@ -212,7 +212,7 @@ void switch_mode()
         // Set it to visible and focus on it
         lv_obj_clear_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
         lv_group_focus_obj(volume_arc);
-
+        lv_group_set_editing(lv_group_get_default(), true);
     }
     else if(mode == 1) // Volume control mode, switch to music control mode
     {
@@ -346,15 +346,15 @@ void ui_menu_init(lv_obj_t *parent)
     // Arc for volume control
     volume_arc = lv_arc_create(page);
     lv_obj_set_size(volume_arc, LV_HOR_RES - 40, LV_VER_RES - 40);
-    lv_arc_set_rotation(volume_arc, 180 + (180 - 150) / 2);
-    lv_arc_set_bg_angles(volume_arc, 0, 150);
+    lv_arc_set_rotation(volume_arc, 180 + (180 - 120) / 2);
+    lv_arc_set_bg_angles(volume_arc, 0, 120);
     lv_arc_set_value(volume_arc, 5);
     lv_arc_set_range(volume_arc, 0, 10);
     lv_obj_set_style_arc_width(volume_arc, 10, LV_PART_MAIN);
     lv_obj_set_style_arc_width(volume_arc, 10, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(volume_arc, lv_color_make(230, 103, 80), LV_PART_MAIN);
     lv_obj_set_style_arc_color(volume_arc, lv_color_make(230, 103, 80), LV_PART_INDICATOR);
-    lv_obj_align(volume_arc, LV_ALIGN_TOP_MID, 0, 15);
+    lv_obj_align(volume_arc, LV_ALIGN_TOP_MID, 0, -5);
     // Assign invisible flag to arc by default
     lv_obj_add_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
 
