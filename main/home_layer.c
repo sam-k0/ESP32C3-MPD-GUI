@@ -66,6 +66,8 @@ static lv_obj_t *label_switchmode;
 mpd_song_t *song_home = NULL;
 mpd_status_t* status_home = NULL;
 uint8_t mode = 0;
+uint8_t volume_idle_counter = 5;
+
 const char* audio_symbols[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX};
 
 // helper functions
@@ -149,17 +151,17 @@ static void volume_arc_event_cb(lv_event_t* e)
     uint8_t value = lv_arc_get_value(volume_arc);
 
     if (LV_EVENT_KEY == code) // scroll?
-    { 
+    {   
+        volume_idle_counter = 0; // reset idle counter to not interrupt user
         uint32_t key = lv_event_get_key(e);
         if (LV_KEY_RIGHT == key) {
             ESP_LOGI("volume_arc_event_cb", "LV_KEY_RIGHT: %d", value);
-            //mpd_volume_up();
+            mpd_set_volume(value*10);
         } else if (LV_KEY_LEFT == key) {
             ESP_LOGI("volume_arc_event_cb", "LV_KEY_LEFT: %d", value);
-            //mpd_volume_down();
+            mpd_set_volume(value*10);
         }
 
-        
     } else if (LV_EVENT_CLICKED == code) {
     // Handle click event
         ESP_LOGI("volume_arc_event_cb", "LV_EVENT_CLICKED in volume_arc_event_cb");
@@ -168,7 +170,7 @@ static void volume_arc_event_cb(lv_event_t* e)
 }
 
 // Method to update play/pause button
-void update_play_pause_button()
+void update_ui_from_status()
 {
     status_home = malloc(sizeof(mpd_status_t));
     mpd_get_status(status_home);
@@ -197,6 +199,24 @@ void update_play_pause_button()
         index = status_home->volume / 50;
         lv_label_set_text(label_switchmode, audio_symbols[index]);
     }
+    // Update volume arc
+    uint8_t overflow = status_home->volume % 10;
+    uint8_t target = status_home->volume - overflow;
+    if (target != 0)
+    {
+        target = target / 10; // calculate the value for the arc
+    }
+
+    if (volume_idle_counter >= 5) {
+        ESP_LOGI("volume_layer_timer_cb", "Setting volume to %d as user is idle", target);
+        lv_arc_set_value(volume_arc, target);
+    }else {
+        volume_idle_counter++;
+    }
+
+
+
+
     free(status_home);
 }
 
@@ -352,8 +372,8 @@ void ui_menu_init(lv_obj_t *parent)
     lv_arc_set_range(volume_arc, 0, 10);
     lv_obj_set_style_arc_width(volume_arc, 10, LV_PART_MAIN);
     lv_obj_set_style_arc_width(volume_arc, 10, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(volume_arc, lv_color_make(230, 103, 80), LV_PART_MAIN);
-    lv_obj_set_style_arc_color(volume_arc, lv_color_make(230, 103, 80), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(volume_arc, lv_color_hex(COLOUR_WHITE), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(volume_arc, lv_color_hex(COLOUR_WHITE), LV_PART_INDICATOR);
     lv_obj_align(volume_arc, LV_ALIGN_TOP_MID, 0, -5);
     // Assign invisible flag to arc by default
     lv_obj_add_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
@@ -435,7 +455,7 @@ static void main_layer_timer_cb(lv_timer_t *tmr)
         //ESP_LOGI("main_layer_timer_cb", "Timer callback");
 
         // Update play/pause button
-        update_play_pause_button();
+        update_ui_from_status();
 
         song_home = malloc(sizeof(mpd_song_t));
         mpd_get_currentsong(song_home);
@@ -469,6 +489,8 @@ static void main_layer_timer_cb(lv_timer_t *tmr)
         {
             lv_label_set_text(label_artist, song_home->artist);
         }
+
+
 
         free(song_home);
     }
