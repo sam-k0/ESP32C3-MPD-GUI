@@ -70,7 +70,7 @@ void ui_volume_init(lv_obj_t *parent)
     lv_obj_t *img = lv_img_create(page);
     lv_img_set_src(img, &img_main_bg);
     lv_img_set_zoom(img, 512);
-    lv_obj_align(img, LV_ALIGN_LEFT_MID, 7,0);
+    lv_obj_align(img, LV_ALIGN_CENTER, 0,0);
 
     label_name = lv_label_create(page);
     lv_label_set_text(label_name, "Volume");
@@ -80,8 +80,22 @@ void ui_volume_init(lv_obj_t *parent)
     lv_obj_set_style_text_align(label_name, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_name, LV_ALIGN_CENTER, 0, 0);
 
+    // style for the roller
+    static lv_style_t style;
+    lv_style_init(&style);
+    lv_style_set_bg_color(&style, lv_color_black());
+    lv_style_set_bg_opa(&style, LV_OPA_0);
+    lv_style_set_text_color(&style, lv_color_white());
+    lv_style_set_border_width(&style, 0);
+    lv_style_set_pad_all(&style, 0);
+    lv_obj_add_style(lv_scr_act(), &style, 0);
+
     // Roller for volume control
     roller_volume = lv_roller_create(page);
+    lv_obj_add_style(roller_volume, &style, 0);
+    lv_obj_set_style_text_line_space(roller_volume, 40, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(roller_volume, LV_OPA_TRANSP, LV_PART_SELECTED);
+
     lv_roller_set_options(roller_volume, "0\n10\n20\n30\n40\n50\n60\n70\n80\n90\n100", LV_ROLLER_MODE_NORMAL);
     lv_roller_set_visible_row_count(roller_volume, 3);
     lv_obj_align(roller_volume, LV_ALIGN_CENTER, 0, 0);

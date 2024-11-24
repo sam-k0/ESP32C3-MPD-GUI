@@ -22,6 +22,10 @@ static void next_event_cb(lv_event_t *e);
 static void prev_event_cb(lv_event_t *e);
 static void switchmode_event_cb(lv_event_t *e);
 static void button_scroll_event_cb(lv_event_t *e);
+static void volume_arc_event_cb(lv_event_t *e);
+
+void switch_mode();
+
 
 lv_layer_t home_layer = {
     .lv_obj_name    = "home_layer",
@@ -50,6 +54,7 @@ static lv_obj_t *btn_prev;
 static lv_obj_t *btn_play_pause;
 static lv_obj_t *btn_next;
 static lv_obj_t *btn_switchmode;
+static lv_obj_t *volume_arc;
 
 static lv_obj_t *label_play_pause;
 static lv_obj_t *label_prev;
@@ -60,6 +65,7 @@ static lv_obj_t *label_switchmode;
 
 mpd_song_t *song_home = NULL;
 mpd_status_t* status_home = NULL;
+uint8_t mode = 0;
 const char* audio_symbols[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX};
 
 // helper functions
@@ -112,10 +118,11 @@ static void prev_event_cb(lv_event_t *e)
 
 static void switchmode_event_cb(lv_event_t *e)
 {
+    switch_mode();
     // Go to volume layer
-    ESP_LOGI("switchmode_event_cb", "LV_EVENT_CLICKED in switchmode_event_cb");
-    ui_remove_all_objs_from_encoder_group();
-    lv_func_goto_layer(&volume_layer);
+    //ESP_LOGI("switchmode_event_cb", "LV_EVENT_CLICKED in switchmode_event_cb");
+    //ui_remove_all_objs_from_encoder_group();
+    //lv_func_goto_layer(&volume_layer);
 
 }
 
@@ -136,14 +143,38 @@ static void button_scroll_event_cb(lv_event_t *e)
     }
 }
 
+static void volume_arc_event_cb(lv_event_t* e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    uint8_t value = lv_arc_get_value(volume_arc);
+
+    if (LV_EVENT_KEY == code) // scroll?
+    { 
+        uint32_t key = lv_event_get_key(e);
+        if (LV_KEY_RIGHT == key) {
+            ESP_LOGI("volume_arc_event_cb", "LV_KEY_RIGHT: %d", value);
+            //mpd_volume_up();
+        } else if (LV_KEY_LEFT == key) {
+            ESP_LOGI("volume_arc_event_cb", "LV_KEY_LEFT: %d", value);
+            //mpd_volume_down();
+        }
+
+        
+    } else if (LV_EVENT_CLICKED == code) {
+    // Handle click event
+        ESP_LOGI("volume_arc_event_cb", "LV_EVENT_CLICKED in volume_arc_event_cb");
+        switch_mode();
+    }
+}
+
 // Method to update play/pause button
 void update_play_pause_button()
 {
     status_home = malloc(sizeof(mpd_status_t));
     mpd_get_status(status_home);
 
-    ESP_LOGI("elapsed", "Elapsed: %d", status_home->elapsed);
-    ESP_LOGI("duration", "Duration: %d", status_home->duration);
+    //ESP_LOGI("elapsed", "Elapsed: %d", status_home->elapsed);
+    //ESP_LOGI("duration", "Duration: %d", status_home->duration);
 
     if (status_home->state == MPD_STATE_PLAY) {
         lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
@@ -167,6 +198,36 @@ void update_play_pause_button()
         lv_label_set_text(label_switchmode, audio_symbols[index]);
     }
     free(status_home);
+}
+
+void switch_mode()
+{
+    if(mode == 0) // Music control mode, switch to volume control mode
+    {
+        mode = 1;
+        // Remove everything from default group
+        ui_remove_all_objs_from_encoder_group();
+        // Only have volume arc in the group
+        lv_group_add_obj(lv_group_get_default(), volume_arc);
+        // Set it to visible and focus on it
+        lv_obj_clear_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
+        lv_group_focus_obj(volume_arc);
+
+    }
+    else if(mode == 1) // Volume control mode, switch to music control mode
+    {
+        mode = 0;
+        // Remove everything from default group
+        ui_remove_all_objs_from_encoder_group();
+        // Add all buttons to the group
+        lv_group_add_obj(lv_group_get_default(), btn_prev);
+        lv_group_add_obj(lv_group_get_default(), btn_play_pause);
+        lv_group_add_obj(lv_group_get_default(), btn_switchmode);
+        lv_group_add_obj(lv_group_get_default(), btn_next);
+        // Make volume arc invisible and focus on play/pause button
+        lv_obj_add_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
+        lv_group_focus_obj(btn_play_pause);
+    }
 }
 
 static void menu_event_cb(lv_event_t *e)
@@ -251,7 +312,6 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_align(label_time, LV_ALIGN_CENTER, 0, 30);
 
     // Buttons for prev, play/pause, next
-
     btn_prev = lv_btn_create(page);
     lv_obj_set_size(btn_prev, 30, 30);
     lv_obj_align(btn_prev, LV_ALIGN_BOTTOM_LEFT, 25, -15);
@@ -283,6 +343,22 @@ void ui_menu_init(lv_obj_t *parent)
     lv_label_set_text(label_next, LV_SYMBOL_NEXT);
     lv_obj_set_style_text_align(label_next, LV_TEXT_ALIGN_CENTER, 0);
 
+    // Arc for volume control
+    volume_arc = lv_arc_create(page);
+    lv_obj_set_size(volume_arc, LV_HOR_RES - 40, LV_VER_RES - 40);
+    lv_arc_set_rotation(volume_arc, 180 + (180 - 150) / 2);
+    lv_arc_set_bg_angles(volume_arc, 0, 150);
+    lv_arc_set_value(volume_arc, 5);
+    lv_arc_set_range(volume_arc, 0, 10);
+    lv_obj_set_style_arc_width(volume_arc, 10, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(volume_arc, 10, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(volume_arc, lv_color_make(230, 103, 80), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(volume_arc, lv_color_make(230, 103, 80), LV_PART_INDICATOR);
+    lv_obj_align(volume_arc, LV_ALIGN_TOP_MID, 0, 15);
+    // Assign invisible flag to arc by default
+    lv_obj_add_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
+
+
     // Groups
     lv_group_add_obj(lv_group_get_default(), btn_prev);
     lv_group_add_obj(lv_group_get_default(), btn_play_pause);
@@ -292,15 +368,11 @@ void ui_menu_init(lv_obj_t *parent)
 
     // callback for play/pause button
     lv_obj_add_event_cb(btn_play_pause, play_pause_event_cb, LV_EVENT_CLICKED, NULL);
-    // callback for next button
     lv_obj_add_event_cb(btn_next, next_event_cb, LV_EVENT_CLICKED, NULL);
-    // callback for prev button
     lv_obj_add_event_cb(btn_prev, prev_event_cb, LV_EVENT_CLICKED, NULL);
-    // callback for switchmode button
     lv_obj_add_event_cb(btn_switchmode, switchmode_event_cb, LV_EVENT_CLICKED, NULL);
 
     // Scroll event for focused and defocused
-
     lv_obj_add_event_cb(btn_prev, button_scroll_event_cb, LV_EVENT_FOCUSED, NULL);
     lv_obj_add_event_cb(btn_prev, button_scroll_event_cb, LV_EVENT_DEFOCUSED, NULL);
 
@@ -313,11 +385,13 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_add_event_cb(btn_switchmode, button_scroll_event_cb, LV_EVENT_FOCUSED, NULL);
     lv_obj_add_event_cb(btn_switchmode, button_scroll_event_cb, LV_EVENT_DEFOCUSED, NULL);
 
+    // Volume arc events
+    lv_obj_add_event_cb(volume_arc, volume_arc_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(volume_arc, volume_arc_event_cb, LV_EVENT_KEY, NULL);
+
     // Set play/pause button as default
     lv_group_focus_obj(btn_play_pause);
 
-    // update play/pause button
-    //update_play_pause_button();
 }
 
 static bool main_layer_enter_cb(void *layer)
@@ -358,16 +432,16 @@ static void main_layer_timer_cb(lv_timer_t *tmr)
 
     if(is_time_out(&time_2000ms)) {
         
-        ESP_LOGI("main_layer_timer_cb", "Timer callback");
+        //ESP_LOGI("main_layer_timer_cb", "Timer callback");
 
         // Update play/pause button
         update_play_pause_button();
 
         song_home = malloc(sizeof(mpd_song_t));
         mpd_get_currentsong(song_home);
-        ESP_LOGI("main_layer_timer_cb", "Song: %s", song_home->title);
-        ESP_LOGI("main_layer_timer_cb", "Artist: %s", song_home->artist);
-        ESP_LOGI("main_layer_timer_cb", "file: %s", song_home->file);
+        //ESP_LOGI("main_layer_timer_cb", "Song: %s", song_home->title);
+        //ESP_LOGI("main_layer_timer_cb", "Artist: %s", song_home->artist);
+        //ESP_LOGI("main_layer_timer_cb", "file: %s", song_home->file);
 
         // Update song name and artist
         if(song_home->title[0] == '\0')

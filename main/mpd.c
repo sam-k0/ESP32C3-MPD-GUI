@@ -174,7 +174,7 @@ int connect_send_close(const char* ip_addr, uint16_t port, const char *cmd, char
         return -1;
     }
     temp_buf[greeting_recv] = '\0';
-    ESP_LOGI("MPD", "Greeting: %s", temp_buf);
+    //ESP_LOGI("MPD", "Greeting: %s", temp_buf);
 
     int bytes_recv = send_mpd_cmd(sock, cmd, resp, resp_size);
     close(sock);
