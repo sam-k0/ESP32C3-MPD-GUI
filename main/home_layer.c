@@ -9,8 +9,6 @@
 
 #include "lv_example_pub.h"
 #include "mpd.h"
-//#include "bg.h"
-
 
 static bool main_layer_enter_cb(void *layer);
 static bool main_layer_exit_cb(void *layer);
@@ -39,12 +37,13 @@ lv_layer_t home_layer = {
 
 static time_out_count time_100ms, time_500ms, time_2000ms;
 
-
+// Main control elements
 static lv_obj_t *page;
-static lv_obj_t *label_name;
+static lv_obj_t *label_status;
 static lv_obj_t *label_songname;
 static lv_obj_t *label_artist;
 static lv_obj_t *label_time;
+static lv_obj_t *label_volume;
 
 // BG image
 static lv_obj_t *img;
@@ -55,19 +54,16 @@ static lv_obj_t *btn_play_pause;
 static lv_obj_t *btn_next;
 static lv_obj_t *btn_switchmode;
 static lv_obj_t *volume_arc;
-
+// Labels for buttons
 static lv_obj_t *label_play_pause;
 static lv_obj_t *label_prev;
 static lv_obj_t *label_next;
 static lv_obj_t *label_switchmode;
-
-
-
+// Local variables
 mpd_song_t *song_home = NULL;
 mpd_status_t* status_home = NULL;
 uint8_t mode = 0;
 uint8_t volume_idle_counter = 5;
-
 const char* audio_symbols[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX};
 
 // helper functions
@@ -92,13 +88,13 @@ static void play_pause_event_cb(lv_event_t *e)
         ESP_LOGI("play_pause_event_cb", "Pausing");
         mpd_pause();
         // Set label to paused
-        lv_label_set_text(label_name, "Paused");
+        lv_label_set_text(label_status, "Paused");
         lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
     } else {
         ESP_LOGI("play_pause_event_cb", "Playing");
         mpd_play();
         // Set label to play
-        lv_label_set_text(label_name, "Playing");
+        lv_label_set_text(label_status, "Playing");
         lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
     }
     free(status_home);
@@ -162,6 +158,11 @@ static void volume_arc_event_cb(lv_event_t* e)
             mpd_set_volume(value*10);
         }
 
+        // Update volume label
+        char volume_str[5];
+        snprintf(volume_str, sizeof(volume_str), "%d", value*10);
+        lv_label_set_text(label_volume, volume_str);
+
     } else if (LV_EVENT_CLICKED == code) {
     // Handle click event
         ESP_LOGI("volume_arc_event_cb", "LV_EVENT_CLICKED in volume_arc_event_cb");
@@ -180,10 +181,10 @@ void update_ui_from_status()
 
     if (status_home->state == MPD_STATE_PLAY) {
         lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
-        lv_label_set_text(label_name, "Playing");
+        lv_label_set_text(label_status, "Playing");
     } else {
         lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
-        lv_label_set_text(label_name, "Paused");
+        lv_label_set_text(label_status, "Paused");
     }
 
     // Update time
@@ -213,9 +214,10 @@ void update_ui_from_status()
     }else {
         volume_idle_counter++;
     }
-
-
-
+    // Update volume label
+    char volume_str[5];
+    snprintf(volume_str, sizeof(volume_str), "%d", status_home->volume);
+    lv_label_set_text(label_volume, volume_str);
 
     free(status_home);
 }
@@ -231,6 +233,7 @@ void switch_mode()
         lv_group_add_obj(lv_group_get_default(), volume_arc);
         // Set it to visible and focus on it
         lv_obj_clear_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(label_volume, LV_OBJ_FLAG_HIDDEN);
         lv_group_focus_obj(volume_arc);
         lv_group_set_editing(lv_group_get_default(), true);
     }
@@ -246,6 +249,7 @@ void switch_mode()
         lv_group_add_obj(lv_group_get_default(), btn_next);
         // Make volume arc invisible and focus on play/pause button
         lv_obj_add_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(label_volume, LV_OBJ_FLAG_HIDDEN);
         lv_group_focus_obj(btn_play_pause);
     }
 }
@@ -263,10 +267,10 @@ static void menu_event_cb(lv_event_t *e)
         if (is_time_out(&time_100ms)) {
             // Knob rotate controls
             if (LV_KEY_RIGHT == key) {
-                lv_obj_set_style_text_color(label_name, lv_color_make(0x00, 0xff, 0x00), 0);
+                lv_obj_set_style_text_color(label_status, lv_color_make(0x00, 0xff, 0x00), 0);
                 ESP_LOGI("menu_event_cb", "LV_KEY_RIGHT");
             } else if (LV_KEY_LEFT == key) {
-                lv_obj_set_style_text_color(label_name, lv_color_make(0x00, 0xff, 0x00), 0);
+                lv_obj_set_style_text_color(label_status, lv_color_make(0x00, 0xff, 0x00), 0);
                 ESP_LOGI("menu_event_cb", "LV_KEY_LEFT");
             }
         }
@@ -303,13 +307,13 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
 
-    label_name = lv_label_create(page);
-    lv_label_set_text(label_name, "Paused");
+    label_status = lv_label_create(page);
+    lv_label_set_text(label_status, "Paused");
     
-    lv_obj_set_style_text_color(label_name, lv_color_hex(COLOUR_WHITE), 0);
-    lv_obj_set_width(label_name, 150);
-    lv_obj_set_style_text_align(label_name, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(label_name, LV_ALIGN_BOTTOM_MID, 0, 5);
+    lv_obj_set_style_text_color(label_status, lv_color_hex(COLOUR_WHITE), 0);
+    lv_obj_set_width(label_status, 150);
+    lv_obj_set_style_text_align(label_status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(label_status, LV_ALIGN_BOTTOM_MID, 0, 5);
 
     // Display song name and artist in the middle of the screen
     label_songname = lv_label_create(page);
@@ -375,10 +379,17 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_set_style_arc_color(volume_arc, lv_color_hex(COLOUR_WHITE), LV_PART_MAIN);
     lv_obj_set_style_arc_color(volume_arc, lv_color_hex(COLOUR_WHITE), LV_PART_INDICATOR);
     lv_obj_align(volume_arc, LV_ALIGN_TOP_MID, 0, -5);
-    // Assign invisible flag to arc by default
     lv_obj_add_flag(volume_arc, LV_OBJ_FLAG_HIDDEN);
 
-
+    // Label for volume
+    label_volume = lv_label_create(page);
+    lv_label_set_text(label_volume, "50");
+    lv_obj_set_style_text_color(label_volume, lv_color_hex(COLOUR_WHITE), 0);
+    lv_obj_set_style_text_align(label_volume, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(label_volume, &comicsans, 0);
+    lv_obj_align(label_volume, LV_ALIGN_TOP_MID, 0, 10);
+    lv_obj_add_flag(label_volume, LV_OBJ_FLAG_HIDDEN);
+    
     // Groups
     lv_group_add_obj(lv_group_get_default(), btn_prev);
     lv_group_add_obj(lv_group_get_default(), btn_play_pause);
