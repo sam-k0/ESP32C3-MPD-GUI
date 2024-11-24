@@ -78,7 +78,7 @@ bool parse_mpd_status(const char *response, mpd_status_t *status);
 void mpd_get_status(mpd_status_t* status);
 
 // Wrapper for the MPD currentsong command
-void parse_mpd_currentsong(const char *response, mpd_song_t *song);
+bool parse_mpd_currentsong(const char *response, mpd_song_t *song);
 void mpd_get_currentsong(mpd_song_t *song);
 
 // Simple commands

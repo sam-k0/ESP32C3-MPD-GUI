@@ -44,6 +44,7 @@ static lv_obj_t *label_songname;
 static lv_obj_t *label_artist;
 static lv_obj_t *label_time;
 static lv_obj_t *label_volume;
+static lv_obj_t *bar_song_progress;
 
 // BG image
 static lv_obj_t *img;
@@ -192,6 +193,15 @@ void update_ui_from_status()
     snprintf(time_str, sizeof(time_str), "%02d:%02d / %02d:%02d", time_get_minutes(status_home->elapsed), time_get_seconds(status_home->elapsed), time_get_minutes(status_home->duration), time_get_seconds(status_home->duration));
     lv_label_set_text(label_time, time_str);
 
+    // Update progress bar
+    if (status_home->duration != 0) {
+        lv_bar_set_range(bar_song_progress, 0, status_home->duration);
+        lv_bar_set_value(bar_song_progress, status_home->elapsed, LV_ANIM_ON);
+    } else {
+        lv_bar_set_value(bar_song_progress, 0, LV_ANIM_ON);
+    }
+
+
     // Update audio button symbol by calculating the index of 2 symbols
     uint8_t index = 0;
     if (status_home->volume == 0) {
@@ -218,6 +228,8 @@ void update_ui_from_status()
     char volume_str[5];
     snprintf(volume_str, sizeof(volume_str), "%d", status_home->volume);
     lv_label_set_text(label_volume, volume_str);
+
+
 
     free(status_home);
 }
@@ -335,6 +347,15 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_set_style_text_align(label_time, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_time, LV_ALIGN_CENTER, 0, 30);
 
+    bar_song_progress = lv_bar_create(page);
+    lv_obj_set_size(bar_song_progress, LV_HOR_RES - 40, 3);
+    lv_obj_align(bar_song_progress, LV_ALIGN_CENTER, 0, 40);
+    lv_bar_set_range(bar_song_progress, 0, 100);
+    lv_bar_set_value(bar_song_progress, 1, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(bar_song_progress, lv_color_hex(COLOUR_WHITE), LV_PART_MAIN); // Background color
+    lv_obj_set_style_bg_color(bar_song_progress, lv_color_hex(0x6aaff7), LV_PART_INDICATOR); // Progress color
+
+
     // Buttons for prev, play/pause, next
     btn_prev = lv_btn_create(page);
     lv_obj_set_size(btn_prev, 30, 30);
@@ -342,8 +363,6 @@ void ui_menu_init(lv_obj_t *parent)
     label_prev = lv_label_create(btn_prev);
     lv_label_set_text(label_prev, LV_SYMBOL_PREV);
     lv_obj_set_style_text_align(label_prev, LV_TEXT_ALIGN_CENTER, 0);
-
-
 
     btn_play_pause = lv_btn_create(page);
     lv_obj_set_size(btn_play_pause, 30, 30);

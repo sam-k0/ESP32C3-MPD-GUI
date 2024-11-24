@@ -156,6 +156,7 @@ int send_mpd_cmd(int sock, const char *cmd, char* resp, size_t resp_size)
 }
 
 // Connect to the MPD server, send a command, and close the connection
+// Returns the number of bytes received, -1 on error
 int connect_send_close(const char* ip_addr, uint16_t port, const char *cmd, char* resp, size_t resp_size)
 {
     int sock = connect_mpd(ip_addr, port);
@@ -183,7 +184,7 @@ int connect_send_close(const char* ip_addr, uint16_t port, const char *cmd, char
 
 bool parse_mpd_status(const char *response, mpd_status_t *status) {
     if (response == NULL || status == NULL) {
-        ESP_LOGE("MPD_PARSER", "Invalid arguments to parse_mpd_status.");
+        ESP_LOGI("MPD_PARSER", "Invalid arguments to parse_mpd_status.");
         return false;
     }
     memset(status, 0, sizeof(mpd_status_t));
@@ -230,15 +231,34 @@ bool parse_mpd_status(const char *response, mpd_status_t *status) {
 
 void mpd_get_status(mpd_status_t* status)
 {
-    connect_send_close(MPD_HOST, MPD_PORT, "status\n", mpd_resp_buf, sizeof(mpd_resp_buf));
-    parse_mpd_status(mpd_resp_buf, status);
+    if (connect_send_close(MPD_HOST, MPD_PORT, "status\n", mpd_resp_buf, sizeof(mpd_resp_buf)) < 0) 
+    {
+        ESP_LOGI("MPD", "Failed to get status from MPD");
+    }
+    if (parse_mpd_status(mpd_resp_buf, status) == false)
+    {
+        // Assign default values
+        memset(status, 0, sizeof(mpd_status_t));
+        status->volume = 0;
+        status->repeat = false;
+        status->random = false;
+        status->single = false;
+        status->consume = false;
+        status->playlist = 0;
+        status->playlistlength = 0;
+        status->state = MPD_STATE_STOP;
+        status->song = 0;
+        status->elapsed = 0;
+        status->bitrate = 0;
+        status->duration = 0;
+    }
 }
 
 // Parse the current song response
-void parse_mpd_currentsong(const char *response, mpd_song_t *song) {
+bool parse_mpd_currentsong(const char *response, mpd_song_t *song) {
     if (!response || !song) {
-        fprintf(stderr, "Invalid arguments to parse_mpd_currentsong.\n");
-        return;
+        ESP_LOGI("parse_mpd_currentsong", "Invalid arguments to parse_mpd_currentsong.\n");
+        return false;
     }
 
     // memset(song, 0, sizeof(mpd_song_t));
@@ -278,13 +298,26 @@ void parse_mpd_currentsong(const char *response, mpd_song_t *song) {
         // Move to the next line
         line_start = line_end + 1;
     }
+    return true;
 }
+
 
 
 void mpd_get_currentsong(mpd_song_t *song)
 {
     connect_send_close(MPD_HOST, MPD_PORT, "currentsong\n", mpd_resp_buf, sizeof(mpd_resp_buf));
-    parse_mpd_currentsong(mpd_resp_buf, song);
+    if (parse_mpd_currentsong(mpd_resp_buf, song) == false)
+    {
+        // Assign default values
+        memset(song, 0, sizeof(mpd_song_t));
+        song->title[0] = '\0';
+        song->artist[0] = '\0';
+        song->album[0] = '\0';
+        song->file[0] = '\0';
+        song->duration = 0;
+        song->position = 0;
+        song->id = 0;
+    }
 }
 
 int mpd_set_volume(int volume)
