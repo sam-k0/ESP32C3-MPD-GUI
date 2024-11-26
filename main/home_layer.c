@@ -24,6 +24,12 @@ static void volume_arc_event_cb(lv_event_t *e);
 
 void switch_mode();
 
+// Tasks
+void fetch_currentsong_info_task(void *pvParameter);
+void fetch_status_info_task(void *pvParameter);
+void update_song_info(void *pvParameter);
+void update_ui_from_status(void *pvParameter);
+
 
 lv_layer_t home_layer = {
     .lv_obj_name    = "home_layer",
@@ -35,7 +41,6 @@ lv_layer_t home_layer = {
     .timer_cb       = main_layer_timer_cb,
 };
 
-static time_out_count time_100ms, time_500ms, time_2000ms;
 
 // Main control elements
 static lv_obj_t *page;
@@ -61,11 +66,11 @@ static lv_obj_t *label_prev;
 static lv_obj_t *label_next;
 static lv_obj_t *label_switchmode;
 // Local variables
-mpd_song_t *song_home = NULL;
-mpd_status_t* status_home = NULL;
 uint8_t mode = 0;
 uint8_t volume_idle_counter = 5;
 const char* audio_symbols[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX};
+bool currentsong_in_use = false;
+bool status_in_use = false;
 
 // helper functions
 inline uint8_t time_get_minutes(uint32_t duration)
@@ -78,14 +83,27 @@ inline uint8_t time_get_seconds(uint32_t duration)
     return duration % 60;
 }
 
+void print_memory_info()
+{
+    // Get free heap memory
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    ESP_LOGI("MEM", "Free heap memory: %d bytes", free_heap);
+
+    // Get minimum free stack space for the current task
+    UBaseType_t min_free_stack = uxTaskGetStackHighWaterMark(NULL);
+    ESP_LOGI("MEM", "Minimum free stack space: %d bytes", min_free_stack * sizeof(StackType_t));
+}
+
+
+// Callbacks
 static void play_pause_event_cb(lv_event_t *e)
 {
     // Handle click event
     ESP_LOGI("play_pause_event_cb", "LV_EVENT_CLICKED in play_pause_event_cb");
 
-    status_home = malloc(sizeof(mpd_status_t));
-    mpd_get_status(status_home);
-    if (status_home->state == MPD_STATE_PLAY) {
+    mpd_status_t status;
+    mpd_get_status(&status);
+    if (status.state == MPD_STATE_PLAY) {
         ESP_LOGI("play_pause_event_cb", "Pausing");
         mpd_pause();
         // Set label to paused
@@ -98,7 +116,7 @@ static void play_pause_event_cb(lv_event_t *e)
         lv_label_set_text(label_status, "Playing");
         lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
     }
-    free(status_home);
+    //free(currstatus);
 }
 
 static void next_event_cb(lv_event_t *e)
@@ -171,71 +189,7 @@ static void volume_arc_event_cb(lv_event_t* e)
     }
 }
 
-// Method to update play/pause button
-void update_ui_from_status()
-{
-    status_home = malloc(sizeof(mpd_status_t));
-    mpd_get_status(status_home);
 
-    //ESP_LOGI("elapsed", "Elapsed: %d", status_home->elapsed);
-    //ESP_LOGI("duration", "Duration: %d", status_home->duration);
-
-    if (status_home->state == MPD_STATE_PLAY) {
-        lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
-        lv_label_set_text(label_status, "Playing");
-    } else if (status_home->state == MPD_STATE_PAUSE){
-        lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
-        lv_label_set_text(label_status, "Paused");
-    } else {
-        lv_label_set_text(label_play_pause, LV_SYMBOL_STOP);
-        lv_label_set_text(label_status, "Stopped");
-    }
-
-    // Update time
-    char time_str[20];
-    snprintf(time_str, sizeof(time_str), "%02d:%02d / %02d:%02d", time_get_minutes(status_home->elapsed), time_get_seconds(status_home->elapsed), time_get_minutes(status_home->duration), time_get_seconds(status_home->duration));
-    lv_label_set_text(label_time, time_str);
-
-    // Update progress bar
-    if (status_home->duration != 0) {
-        lv_bar_set_range(bar_song_progress, 0, status_home->duration);
-        lv_bar_set_value(bar_song_progress, status_home->elapsed, LV_ANIM_ON);
-    } else {
-        lv_bar_set_value(bar_song_progress, 0, LV_ANIM_ON);
-    }
-
-
-    // Update audio button symbol by calculating the index of 2 symbols
-    uint8_t index = 0;
-    if (status_home->volume == 0) {
-        lv_label_set_text(label_switchmode, LV_SYMBOL_MUTE);
-    } else {
-        index = status_home->volume / 50;
-        lv_label_set_text(label_switchmode, audio_symbols[index]);
-    }
-    // Update volume arc
-    uint8_t overflow = status_home->volume % 10;
-    uint8_t target = status_home->volume - overflow;
-    if (target != 0)
-    {
-        target = target / 10; // calculate the value for the arc
-    }
-
-    if (volume_idle_counter >= 5) {
-        ESP_LOGI("volume_layer_timer_cb", "Setting volume to %d as user is idle", target);
-        lv_arc_set_value(volume_arc, target);
-    }else {
-        volume_idle_counter++;
-    }
-    // Update volume label
-    char volume_str[5];
-    snprintf(volume_str, sizeof(volume_str), "%d", status_home->volume);
-    lv_label_set_text(label_volume, volume_str);
-
-
-
-    free(status_home);
-}
 
 void switch_mode()
 {
@@ -267,6 +221,136 @@ void switch_mode()
         lv_obj_add_flag(label_volume, LV_OBJ_FLAG_HIDDEN);
         lv_group_focus_obj(btn_play_pause);
     }
+}
+
+// tasks
+// Task to fetch song info and status
+void fetch_currentsong_info_task(void *pvParameters)
+{
+    // Sleep for a while before fetching
+    vTaskDelay(pdMS_TO_TICKS(2000)); // Adjust the delay as needed
+
+    while (1) {
+
+        //song_home = malloc(sizeof(mpd_song_t));
+        mpd_song_t song;
+        mpd_get_currentsong(&song);
+        
+        print_memory_info();
+        lv_async_call(update_song_info, &song);
+
+        // Delay for a while before fetching again
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Adjust the delay as needed
+    }
+}
+
+void fetch_status_info_task(void *pvParameters)
+{
+    // Sleep for a while before fetching
+    vTaskDelay(pdMS_TO_TICKS(3000)); // Adjust the delay as needed
+
+    while (1) {
+        mpd_status_t status;
+        mpd_get_status(&status);
+
+        //print_memory_info();
+
+        lv_async_call(update_ui_from_status, &status);
+
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Adjust the delay as needed
+    }
+}
+
+// Updates UI and frees the parameter mem
+void update_song_info(void *param)
+{
+    mpd_song_t* song_ref = (mpd_song_t*)param;
+    currentsong_in_use = true; // set flag so that we don't get new info while updating
+    
+    // Only update song name if it hasn't changed
+    if (strcmp(lv_label_get_text(label_songname), song_ref->title) != 0) {
+        ESP_LOGI("main_layer_timer_cb", "Updating song name");
+        // Update song name and artist
+        if (song_ref->title[0] == '\0') {
+            if (song_ref->file[0] != '\0') {
+                lv_label_set_text(label_songname, song_ref->file);
+            } else {
+                lv_label_set_text(label_songname, "No Song (still a long name)");
+            }
+        } else {
+            lv_label_set_text(label_songname, song_ref->title);
+        }
+    }
+
+    // Check if artist is empty string
+    if (song_ref->artist[0] == '\0') {
+        lv_label_set_text(label_artist, "Unknown Artist");
+    } else {
+        lv_label_set_text(label_artist, song_ref->artist);
+    }
+
+    currentsong_in_use = false;
+}
+
+// Method to update play/pause button
+void update_ui_from_status(void *pvParameter)
+{
+    mpd_status_t* my_status= (mpd_status_t*)pvParameter;
+
+    status_in_use = true; // set flag so that we don't get new info while updating
+    if (my_status->state == MPD_STATE_PLAY) {
+        lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
+        lv_label_set_text(label_status, "Playing");
+    } else if (my_status->state == MPD_STATE_PAUSE){
+        lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
+        lv_label_set_text(label_status, "Paused");
+    } else {
+        lv_label_set_text(label_play_pause, LV_SYMBOL_STOP);
+        lv_label_set_text(label_status, "Stopped");
+    }
+
+    // Update time
+    char time_str[20];
+    snprintf(time_str, sizeof(time_str), "%02d:%02d / %02d:%02d", time_get_minutes(my_status->elapsed), time_get_seconds(my_status->elapsed), time_get_minutes(my_status->duration), time_get_seconds(my_status->duration));
+    lv_label_set_text(label_time, time_str);
+
+    // Update progress bar
+    if (my_status->duration != 0) {
+        lv_bar_set_range(bar_song_progress, 0, my_status->duration);
+        lv_bar_set_value(bar_song_progress, my_status->elapsed, LV_ANIM_ON);
+    } else {
+        lv_bar_set_value(bar_song_progress, 0, LV_ANIM_ON);
+    }
+
+
+    // Update audio button symbol by calculating the index of 2 symbols
+    uint8_t index = 0;
+    if (my_status->volume == 0) {
+        lv_label_set_text(label_switchmode, LV_SYMBOL_MUTE);
+    } else {
+        index = my_status->volume / 50;
+        lv_label_set_text(label_switchmode, audio_symbols[index]);
+    }
+    // Update volume arc
+    uint8_t overflow = my_status->volume % 10;
+    uint8_t target = my_status->volume - overflow;
+    if (target != 0)
+    {
+        target = target / 10; // calculate the value for the arc
+    }
+
+    if (volume_idle_counter >= 5) {
+        lv_arc_set_value(volume_arc, target);
+    }else {
+        volume_idle_counter++;
+    }
+    // Update volume label
+    char volume_str[5];
+    snprintf(volume_str, sizeof(volume_str), "%d", my_status->volume);
+    lv_label_set_text(label_volume, volume_str);
+
+    //free(status_home);
+    status_in_use = false;
 }
 
 
@@ -406,6 +490,9 @@ void ui_menu_init(lv_obj_t *parent)
     // Set play/pause button as default
     lv_group_focus_obj(btn_play_pause);
 
+    // Start tasks
+    xTaskCreate(fetch_currentsong_info_task, "fetch_currentsong_info_task", 4096, NULL, 5, NULL);
+    xTaskCreate(fetch_status_info_task, "fetch_status_info_task", 4096, NULL, 5, NULL);
 }
 
 static bool main_layer_enter_cb(void *layer)
@@ -424,9 +511,7 @@ static bool main_layer_enter_cb(void *layer)
 
         ui_menu_init(create_layer->lv_obj_layer);
     }
-    set_time_out(&time_100ms, 200);
-    set_time_out(&time_500ms, 500);
-    set_time_out(&time_2000ms, 2000);
+
     feed_clock_time();
 
     return ret;
@@ -438,60 +523,7 @@ static bool main_layer_exit_cb(void *layer)
     return true;
 }
 
-// Updates ui based on mpd status
 static void main_layer_timer_cb(lv_timer_t *tmr)
 {
     feed_clock_time();
-    
-
-    if(is_time_out(&time_2000ms) && true) {
-        
-        //ESP_LOGI("main_layer_timer_cb", "Timer callback");
-
-        // Update play/pause button
-        update_ui_from_status();
-
-        song_home = malloc(sizeof(mpd_song_t));
-        mpd_get_currentsong(song_home);
-        //ESP_LOGI("main_layer_timer_cb", "Song: %s", song_home->title);
-        //ESP_LOGI("main_layer_timer_cb", "Artist: %s", song_home->artist);
-        //ESP_LOGI("main_layer_timer_cb", "file: %s", song_home->file);
-
-        // Only update song name if it hasn't changed
-        if(strcmp(lv_label_get_text(label_songname), song_home->title) != 0)
-        {
-            ESP_LOGI("main_layer_timer_cb", "Updating song name");
-            // Update song name and artist
-            if(song_home->title[0] == '\0')
-            {
-                if(song_home->file[0] != '\0')
-                {
-                    lv_label_set_text(label_songname, song_home->file);
-                }
-                else
-                {
-                    lv_label_set_text(label_songname, "No Song (still a long name)");
-                }
-            }
-            else
-            {
-                lv_label_set_text(label_songname, song_home->title);
-            }
-        }
-        
-
-        // Check if artist is empty string
-        if(song_home->artist[0] == '\0')
-        {
-            lv_label_set_text(label_artist, "Unknown Artist");
-        }
-        else
-        {
-            lv_label_set_text(label_artist, song_home->artist);
-        }
-
-
-
-        free(song_home);
-    }
 }

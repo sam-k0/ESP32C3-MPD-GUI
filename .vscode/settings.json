@@ -21,6 +21,8 @@
         "cstdlib": "c",
         "*.tcc": "c",
         "fstream": "c",
-        "my_secrets.h": "c"
+        "my_secrets.h": "c",
+        "inet.h": "c",
+        "sockets.h": "c"
     }
 }

@@ -13,6 +13,7 @@
 #include "lv_example_pub.h"
 #include "mpd.h"
 
+
 static const char *TAG = "main";
 
 void app_main(void)

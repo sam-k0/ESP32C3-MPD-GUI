@@ -14,6 +14,7 @@
 #include "lwip/inet.h" //internet operations for lwip
 
 
+
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
 {
@@ -126,6 +127,7 @@ int connect_mpd(const char* ip_addr, uint16_t port)
     if (connect(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) 
     {
         ESP_LOGE("MPD", "Connection to server failed");
+        close(sock);
         return -1;
     }
 
@@ -254,6 +256,24 @@ void mpd_get_status(mpd_status_t* status)
     }
 }
 
+void mpd_get_status_dummy(mpd_status_t* status)
+{
+    // Assign default values
+    memset(status, 0, sizeof(mpd_status_t));
+    status->volume = 0;
+    status->repeat = false;
+    status->random = false;
+    status->single = false;
+    status->consume = false;
+    status->playlist = 0;
+    status->playlistlength = 0;
+    status->state = MPD_STATE_STOP;
+    status->song = 0;
+    status->elapsed = 0;
+    status->bitrate = 0;
+    status->duration = 0;
+}
+
 // Parse the current song response
 bool parse_mpd_currentsong(const char *response, mpd_song_t *song) {
     if (!response || !song) {
@@ -301,8 +321,6 @@ bool parse_mpd_currentsong(const char *response, mpd_song_t *song) {
     return true;
 }
 
-
-
 void mpd_get_currentsong(mpd_song_t *song)
 {
     connect_send_close(MPD_HOST, MPD_PORT, "currentsong\n", mpd_resp_buf, sizeof(mpd_resp_buf));
@@ -318,6 +336,20 @@ void mpd_get_currentsong(mpd_song_t *song)
         song->position = 0;
         song->id = 0;
     }
+}
+
+void mpd_get_currentsong_dummy(mpd_song_t *song)
+{
+    // Assign default values of a dummy song with title "We Could Get More Machinegun Psystyle"
+    memset(song, 0, sizeof(mpd_song_t));
+    strncpy(song->title, "We Could Get More Machinegun Psystyle", sizeof(song->title) - 1);
+    song->title[sizeof(song->title) - 1] = '\0'; // Ensure null termination
+    song->artist[0] = '\0';
+    song->album[0] = '\0';
+    song->file[0] = '\0';
+    song->duration = 0;
+    song->position = 0;
+    song->id = 0;
 }
 
 int mpd_set_volume(int volume)

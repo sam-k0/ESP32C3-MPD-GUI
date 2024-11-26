@@ -73,10 +73,12 @@ int connect_send_close(const char* ip_addr, uint16_t port, const char *cmd, char
 // Wrapper for the MPD status command
 bool parse_mpd_status(const char *response, mpd_status_t *status);
 void mpd_get_status(mpd_status_t* status);
+void mpd_get_status_dummy(mpd_status_t* status);
 
 // Wrapper for the MPD currentsong command
 bool parse_mpd_currentsong(const char *response, mpd_song_t *song);
 void mpd_get_currentsong(mpd_song_t *song);
+void mpd_get_currentsong_dummy(mpd_song_t *song);
 
 // Simple commands
 int mpd_set_volume(int volume);
