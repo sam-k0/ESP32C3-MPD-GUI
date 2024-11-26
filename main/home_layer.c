@@ -291,7 +291,7 @@ void ui_menu_init(lv_obj_t *parent)
 
     // Display song name and artist in the middle of the screen
     label_songname = lv_label_create(page);
-    lv_label_set_text(label_songname, "Song Name");
+    lv_label_set_text(label_songname, "Really Long Song Name for Testing");
     lv_obj_set_style_text_font(label_songname, &comicsans, 0);
     lv_obj_set_style_text_color(label_songname, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_songname, LV_TEXT_ALIGN_CENTER, 0);
@@ -444,7 +444,7 @@ static void main_layer_timer_cb(lv_timer_t *tmr)
     feed_clock_time();
     
 
-    if(is_time_out(&time_2000ms)) {
+    if(is_time_out(&time_2000ms) && true) {
         
         //ESP_LOGI("main_layer_timer_cb", "Timer callback");
 
@@ -470,7 +470,7 @@ static void main_layer_timer_cb(lv_timer_t *tmr)
                 }
                 else
                 {
-                    lv_label_set_text(label_songname, "No Song");
+                    lv_label_set_text(label_songname, "No Song (still a long name)");
                 }
             }
             else
