@@ -69,8 +69,6 @@ static lv_obj_t *label_switchmode;
 uint8_t mode = 0;
 uint8_t volume_idle_counter = 5;
 const char* audio_symbols[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX};
-bool currentsong_in_use = false;
-bool status_in_use = false;
 
 // helper functions
 inline uint8_t time_get_minutes(uint32_t duration)
@@ -228,11 +226,9 @@ void switch_mode()
 void fetch_currentsong_info_task(void *pvParameters)
 {
     // Sleep for a while before fetching
-    vTaskDelay(pdMS_TO_TICKS(2000)); // Adjust the delay as needed
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
     while (1) {
-
-        //song_home = malloc(sizeof(mpd_song_t));
         mpd_song_t song;
         mpd_get_currentsong(&song);
         
@@ -240,24 +236,22 @@ void fetch_currentsong_info_task(void *pvParameters)
         lv_async_call(update_song_info, &song);
 
         // Delay for a while before fetching again
-        vTaskDelay(pdMS_TO_TICKS(2000)); // Adjust the delay as needed
+        vTaskDelay(pdMS_TO_TICKS(2000)); 
     }
 }
 
 void fetch_status_info_task(void *pvParameters)
 {
     // Sleep for a while before fetching
-    vTaskDelay(pdMS_TO_TICKS(3000)); // Adjust the delay as needed
+    vTaskDelay(pdMS_TO_TICKS(3000)); 
 
     while (1) {
         mpd_status_t status;
         mpd_get_status(&status);
 
-        //print_memory_info();
-
         lv_async_call(update_ui_from_status, &status);
 
-        vTaskDelay(pdMS_TO_TICKS(2000)); // Adjust the delay as needed
+        vTaskDelay(pdMS_TO_TICKS(2000)); 
     }
 }
 
@@ -265,7 +259,6 @@ void fetch_status_info_task(void *pvParameters)
 void update_song_info(void *param)
 {
     mpd_song_t* song_ref = (mpd_song_t*)param;
-    currentsong_in_use = true; // set flag so that we don't get new info while updating
     
     // Only update song name if it hasn't changed
     if (strcmp(lv_label_get_text(label_songname), song_ref->title) != 0) {
@@ -288,8 +281,6 @@ void update_song_info(void *param)
     } else {
         lv_label_set_text(label_artist, song_ref->artist);
     }
-
-    currentsong_in_use = false;
 }
 
 // Method to update play/pause button
@@ -297,7 +288,6 @@ void update_ui_from_status(void *pvParameter)
 {
     mpd_status_t* my_status= (mpd_status_t*)pvParameter;
 
-    status_in_use = true; // set flag so that we don't get new info while updating
     if (my_status->state == MPD_STATE_PLAY) {
         lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
         lv_label_set_text(label_status, "Playing");
@@ -348,9 +338,6 @@ void update_ui_from_status(void *pvParameter)
     char volume_str[5];
     snprintf(volume_str, sizeof(volume_str), "%d", my_status->volume);
     lv_label_set_text(label_volume, volume_str);
-
-    //free(status_home);
-    status_in_use = false;
 }
 
 
@@ -380,13 +367,15 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_set_style_text_color(label_songname, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_songname, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(label_songname, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_obj_set_width(label_songname, LV_HOR_RES - 40);
+    lv_obj_set_width(label_songname, LV_HOR_RES - 6);
     lv_obj_align(label_songname, LV_ALIGN_CENTER, 0, -20);
 
     label_artist = lv_label_create(page);
     lv_label_set_text(label_artist, "Artist");
     lv_obj_set_style_text_color(label_artist, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_artist, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(label_artist, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_width(label_artist, LV_HOR_RES - 6);
     lv_obj_align(label_artist, LV_ALIGN_CENTER, 0, 10);
 
     label_time = lv_label_create(page);
