@@ -14,7 +14,7 @@ static bool main_layer_enter_cb(void *layer);
 static bool main_layer_exit_cb(void *layer);
 static void main_layer_timer_cb(lv_timer_t *tmr);
 // UI Callbacks
-static void menu_event_cb(lv_event_t *e);
+//static void menu_event_cb(lv_event_t *e);
 static void play_pause_event_cb(lv_event_t *e);
 static void next_event_cb(lv_event_t *e);
 static void prev_event_cb(lv_event_t *e);
@@ -183,9 +183,12 @@ void update_ui_from_status()
     if (status_home->state == MPD_STATE_PLAY) {
         lv_label_set_text(label_play_pause, LV_SYMBOL_PAUSE);
         lv_label_set_text(label_status, "Playing");
-    } else {
+    } else if (status_home->state == MPD_STATE_PAUSE){
         lv_label_set_text(label_play_pause, LV_SYMBOL_PLAY);
         lv_label_set_text(label_status, "Paused");
+    } else {
+        lv_label_set_text(label_play_pause, LV_SYMBOL_STOP);
+        lv_label_set_text(label_status, "Stopped");
     }
 
     // Update time
@@ -266,46 +269,6 @@ void switch_mode()
     }
 }
 
-static void menu_event_cb(lv_event_t *e)
-{
-    static uint8_t forbidden_sec_trigger = false;
-
-    lv_event_code_t code = lv_event_get_code(e);
-
-    if (LV_EVENT_FOCUSED == code) {
-        lv_group_set_editing(lv_group_get_default(), true);
-    } else if (LV_EVENT_KEY == code) {
-        uint32_t key = lv_event_get_key(e);
-        if (is_time_out(&time_100ms)) {
-            // Knob rotate controls
-            if (LV_KEY_RIGHT == key) {
-                lv_obj_set_style_text_color(label_status, lv_color_make(0x00, 0xff, 0x00), 0);
-                ESP_LOGI("menu_event_cb", "LV_KEY_RIGHT");
-            } else if (LV_KEY_LEFT == key) {
-                lv_obj_set_style_text_color(label_status, lv_color_make(0x00, 0xff, 0x00), 0);
-                ESP_LOGI("menu_event_cb", "LV_KEY_LEFT");
-            }
-        }
-        feed_clock_time();
-
-    } else if (LV_EVENT_LONG_PRESSED == code) {
-        /*forbidden_sec_trigger = true;
-        ESP_LOGI("menu_event_cb", "LV_EVENT_LONG_PRESSED");
-        lv_indev_wait_release(lv_indev_get_next(NULL));
-        ui_remove_all_objs_from_encoder_group();
-        lv_func_goto_layer(&volume_layer);*/
-
-        
-    } else if (LV_EVENT_CLICKED == code) {
-        if(false == forbidden_sec_trigger) {
-            // Handle click event
-            ESP_LOGI("menu_event_cb", "LV_EVENT_CLICKED");
-        } else {
-            forbidden_sec_trigger = false;
-        }
-        feed_clock_time();
-    }
-}
 
 void ui_menu_init(lv_obj_t *parent)
 {
@@ -321,7 +284,6 @@ void ui_menu_init(lv_obj_t *parent)
 
     label_status = lv_label_create(page);
     lv_label_set_text(label_status, "Paused");
-    
     lv_obj_set_style_text_color(label_status, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_width(label_status, 150);
     lv_obj_set_style_text_align(label_status, LV_TEXT_ALIGN_CENTER, 0);
@@ -333,6 +295,8 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_set_style_text_font(label_songname, &comicsans, 0);
     lv_obj_set_style_text_color(label_songname, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_songname, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(label_songname, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_width(label_songname, LV_HOR_RES - 40);
     lv_obj_align(label_songname, LV_ALIGN_CENTER, 0, -20);
 
     label_artist = lv_label_create(page);
@@ -362,7 +326,7 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_align(btn_prev, LV_ALIGN_BOTTOM_LEFT, 25, -15);
     label_prev = lv_label_create(btn_prev);
     lv_label_set_text(label_prev, LV_SYMBOL_PREV);
-    lv_obj_set_style_text_align(label_prev, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_align(label_prev, LV_TEXT_ALIGN_LEFT, 0);
 
     btn_play_pause = lv_btn_create(page);
     lv_obj_set_size(btn_play_pause, 30, 30);
@@ -493,22 +457,28 @@ static void main_layer_timer_cb(lv_timer_t *tmr)
         //ESP_LOGI("main_layer_timer_cb", "Artist: %s", song_home->artist);
         //ESP_LOGI("main_layer_timer_cb", "file: %s", song_home->file);
 
-        // Update song name and artist
-        if(song_home->title[0] == '\0')
+        // Only update song name if it hasn't changed
+        if(strcmp(lv_label_get_text(label_songname), song_home->title) != 0)
         {
-            if(song_home->file[0] != '\0')
+            ESP_LOGI("main_layer_timer_cb", "Updating song name");
+            // Update song name and artist
+            if(song_home->title[0] == '\0')
             {
-                lv_label_set_text(label_songname, song_home->file);
+                if(song_home->file[0] != '\0')
+                {
+                    lv_label_set_text(label_songname, song_home->file);
+                }
+                else
+                {
+                    lv_label_set_text(label_songname, "No Song");
+                }
             }
             else
             {
-                lv_label_set_text(label_songname, "No Song");
+                lv_label_set_text(label_songname, song_home->title);
             }
         }
-        else
-        {
-            lv_label_set_text(label_songname, song_home->title);
-        }
+        
 
         // Check if artist is empty string
         if(song_home->artist[0] == '\0')
