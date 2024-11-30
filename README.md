@@ -18,3 +18,7 @@ You need to create a `my_secrets.h` file in the `main` directory with the follow
 #define MPD_HOST "192.168.178.1"
 #define MPD_PORT 6600
 ```
+
+## Requirements
+- espressif/esp32_c3_lcdkit: "1.0.*"
+- idf: ">=4.1.0"
