@@ -8,6 +8,7 @@ This project is a music player daemon (MPD) client for the ESP32C3 DevKit. It is
 - Volume control
 - Display song information
 
+
 ## Setup
 
 You need to create a `my_secrets.h` file in the `main` directory with the following content:

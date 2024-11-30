@@ -134,11 +134,6 @@ static void prev_event_cb(lv_event_t *e)
 static void switchmode_event_cb(lv_event_t *e)
 {
     switch_mode();
-    // Go to volume layer
-    //ESP_LOGI("switchmode_event_cb", "LV_EVENT_CLICKED in switchmode_event_cb");
-    //ui_remove_all_objs_from_encoder_group();
-    //lv_func_goto_layer(&volume_layer);
-
 }
 
 static void button_scroll_event_cb(lv_event_t *e)
