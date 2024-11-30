@@ -268,7 +268,7 @@ void update_song_info(void *param)
             if (song_ref->file[0] != '\0') {
                 lv_label_set_text(label_songname, song_ref->file);
             } else {
-                lv_label_set_text(label_songname, "No Song (still a long name)");
+                lv_label_set_text(label_songname, "No song playing...");
             }
         } else {
             lv_label_set_text(label_songname, song_ref->title);
@@ -362,7 +362,7 @@ void ui_menu_init(lv_obj_t *parent)
 
     // Display song name and artist in the middle of the screen
     label_songname = lv_label_create(page);
-    lv_label_set_text(label_songname, "Really Long Song Name for Testing");
+    lv_label_set_text(label_songname, "Connecting to MPD...");
     lv_obj_set_style_text_font(label_songname, &comicsans, 0);
     lv_obj_set_style_text_color(label_songname, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_songname, LV_TEXT_ALIGN_CENTER, 0);
@@ -371,7 +371,7 @@ void ui_menu_init(lv_obj_t *parent)
     lv_obj_align(label_songname, LV_ALIGN_CENTER, 0, -20);
 
     label_artist = lv_label_create(page);
-    lv_label_set_text(label_artist, "Artist");
+    lv_label_set_text(label_artist, "Make sure MPD is running");
     lv_obj_set_style_text_color(label_artist, lv_color_hex(COLOUR_WHITE), 0);
     lv_obj_set_style_text_align(label_artist, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(label_artist, LV_LABEL_LONG_SCROLL_CIRCULAR);
