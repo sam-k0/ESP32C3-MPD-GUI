@@ -7,8 +7,7 @@ This project is a music player daemon (MPD) client for the ESP32C3 DevKit. It is
 - Next/Previous
 - Volume control
 - Display song information
-
-![Screenshot](https://github.com/sam-k0/ESP32C3-MPD-GUI/blob/master/img/img.jpg)
+<img src="https://github.com/sam-k0/ESP32C3-MPD-GUI/blob/master/img/img.jpg" alt="Screenshot" width="300"/>
 
 ## Setup
 
