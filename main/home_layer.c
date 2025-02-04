@@ -68,7 +68,7 @@ static lv_obj_t *label_switchmode;
 // Local variables
 uint8_t mode = 0;
 uint8_t volume_idle_counter = 5;
-const char* audio_symbols[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX};
+const char* audio_symbols[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX, LV_SYMBOL_VOLUME_MAX};
 
 // helper functions
 inline uint8_t time_get_minutes(uint32_t duration)
@@ -322,6 +322,15 @@ void update_ui_from_status(void *pvParameter)
     if (target != 0)
     {
         target = target / 10; // calculate the value for the arc
+
+        // clamp the value to a range between 0 and 10
+        // This hopefully fixes a crash
+
+        if (target > 10) {
+            target = 10;
+        } else if (target < 0) {
+            target = 0;
+        }
     }
 
     if (volume_idle_counter >= 5) {
